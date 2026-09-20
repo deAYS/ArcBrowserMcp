@@ -251,9 +251,9 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
     }
     emit("tabs.query");
 
-    // ---- tabs.update (benign activation of our own tab) ----
+    // ---- tabs.update (non-activating: the test tab must stay in the background) ----
     try {
-      await api.tabs.update(tabId, { active: true });
+      await api.tabs.update(tabId, { active: false });
       capabilities.tabs.update = "pass";
     } catch (error: unknown) {
       capabilities.tabs.update = "fail";
