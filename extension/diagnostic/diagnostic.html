@@ -2,40 +2,83 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Arc MCP Bridge - Diagnostics (Development)</title>
   <style>
-    body { font-family: sans-serif; max-width: 900px; margin: 2em auto; padding: 0 1em; }
-    button { margin-right: 0.5em; padding: 0.4em 1em; }
-    table { border-collapse: collapse; margin-top: 1em; width: 100%; }
-    th, td { border: 1px solid #999; padding: 0.3em 0.6em; text-align: left; }
-    .pass { color: green; font-weight: bold; }
-    .fail { color: red; font-weight: bold; }
-    pre { background: #f4f4f4; padding: 1em; overflow: auto; max-height: 500px; }
-    #status { margin-top: 1em; font-weight: bold; }
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #101418; color: #e6e9ee; max-width: 880px; margin: 0 auto; padding: 2rem 1rem 4rem; line-height: 1.55; }
+    header p { margin-top: 0; opacity: .8; }
+    .card { border: 1px solid #8884; border-radius: .75rem; padding: 1.25rem; margin: 1rem 0; background: #161b21; }
+    .btn { display: inline-block; font: inherit; padding: .6rem 1.25rem; border-radius: .5rem; border: 0; background: #4f8cff; color: #fff; font-weight: 600; cursor: pointer; margin-right: .5rem; }
+    .btn:disabled { opacity: .5; cursor: default; }
+    .btn.secondary { background: transparent; border: 1px solid #8888; color: inherit; font-weight: 400; }
+    #status { font-weight: bold; }
+    #verdict { font-size: 1.25em; font-weight: 700; border-radius: .5rem; padding: .6rem 1rem; }
+    #verdict.verdict-supported { background: #14532d; color: #4ade80; }
+    #verdict.verdict-blocked { background: #450a0a; color: #f87171; }
+    #verdict.verdict-unknown { background: #333; color: #ccc; }
+    table { border-collapse: collapse; margin-top: .5em; width: 100%; }
+    th, td { border: 1px solid #8884; padding: .35em .6em; text-align: left; font-size: .92em; }
+    th { background: #ffffff10; }
+    td.key { white-space: nowrap; opacity: .9; }
+    .pass { color: #4ade80; font-weight: bold; }
+    .fail { color: #f87171; font-weight: bold; }
+    pre { background: #0b0e11; border: 1px solid #8883; padding: 1em; border-radius: .5rem; overflow: auto; max-height: 500px; font-size: .85em; }
+    ul { padding-left: 1.25em; }
+    .meta { opacity: .75; font-size: .9em; }
+    h2 { margin-top: 0; font-size: 1.1em; }
   </style>
 </head>
 <body>
-  <h1>Arc MCP Bridge - Diagnostics (Development)</h1>
-  <p>
-    Runs the capability suite in a dedicated disposable test tab
-    (https://example.com/). Your existing tabs are never touched.
-  </p>
-  <p>
-    <button id="run">Run Arc MCP Diagnostics</button>
-    <button id="copy">Copy JSON</button>
-  </p>
-  <div id="status">Idle. A previous persisted report, if any, is shown below.</div>
-  <h2>Native bridge</h2>
-  <p>
-    <button id="bridge">Refresh bridge status</button>
-  </p>
-  <div id="bridge-status">Bridge status unknown.</div>
-  <table id="matrix">
-    <thead><tr><th>Capability</th><th>Status</th></tr></thead>
-    <tbody></tbody>
-  </table>
-  <h2>Full report (JSON)</h2>
-  <pre id="report">No report yet.</pre>
+  <header>
+    <h1>Arc MCP Bridge - Diagnostics</h1>
+    <p>Runs the capability suite in a dedicated disposable test tab
+      (https://example.com/). Your existing tabs are never touched.</p>
+  </header>
+
+  <div class="card">
+    <button class="btn" id="run">Run Arc MCP Diagnostics</button>
+    <button class="btn secondary" id="copy">Copy JSON</button>
+    <p id="status">Idle. A previous persisted report, if any, is shown below.</p>
+    <p id="verdict" class="verdict-unknown">Verdict: unknown</p>
+    <p id="summary" class="meta"></p>
+  </div>
+
+  <div class="card">
+    <h2>Environment</h2>
+    <table id="env"><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Native bridge <span class="meta">(auto-refreshes while a run is in flight)</span></h2>
+    <p><button class="btn secondary" id="bridge">Refresh bridge status</button></p>
+    <div id="bridge-status">Bridge status unknown.</div>
+  </div>
+
+  <div class="card">
+    <h2>Capability matrix</h2>
+    <table id="matrix">
+      <thead><tr><th>Capability</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Evidence</h2>
+    <table id="evidence"><tbody></tbody></table>
+  </div>
+
+  <div class="card">
+    <h2>Notes &amp; errors</h2>
+    <ul id="notes"></ul>
+    <ul id="errors"></ul>
+  </div>
+
+  <div class="card">
+    <h2>Full report (JSON)</h2>
+    <pre id="report">No report yet.</pre>
+  </div>
+
   <script src="diagnostic.js"></script>
 </body>
 </html>
