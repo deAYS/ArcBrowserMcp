@@ -1,5 +1,5 @@
 /**
- * Authoritative navigation URL policy (P05, shared by Node + extension).
+ * Authoritative navigation URL policy (shared by Node + extension).
  *
  * One parser-backed gate replaces scattered scheme regexes. Node
  * (engine/service/tool) validates before any bridge traffic; the extension

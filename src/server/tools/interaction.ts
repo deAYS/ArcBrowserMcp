@@ -40,10 +40,9 @@ async function callTool<T>(action: () => Promise<T>): Promise<
 }
 
 /**
- * Interaction tool registration (P07). Every tool acts only on the
- * logically selected tab through BrowserService; refs are opaque P06
+ * Interaction tool registration. Every tool acts only on the
+ * logically selected tab through BrowserService; refs are opaque
  * latest-snapshot-only element references resolved extension-side.
- * evaluate/screenshot/waitFor stay unregistered (P08).
  */
 export function registerInteractionTools(server: McpServer, services: InteractionToolServices): void {
   server.registerTool(

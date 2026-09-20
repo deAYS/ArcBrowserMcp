@@ -1,5 +1,5 @@
 /**
- * Pure network ring buffer + CDP event normalization for P09 (Node +
+ * Pure network ring buffer + CDP event normalization (Node +
  * extension, dependency-free).
  *
  * No Chrome/CDP/Node APIs here: callers supply already-extracted raw event

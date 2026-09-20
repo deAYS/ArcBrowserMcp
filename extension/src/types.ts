@@ -1,5 +1,5 @@
 /**
- * Shared diagnostic types for the Arc MCP feasibility spike.
+ * Shared diagnostic types.
  *
  * This module is intentionally free of DOM APIs and the global `chrome`
  * object so the same orchestration code is typechecked by both the

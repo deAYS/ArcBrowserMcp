@@ -1,7 +1,7 @@
 /**
- * Typed bridge errors (P03B transport scope only).
+ * Typed bridge errors.
  *
- * Stable machine-readable codes so both ends and tests discriminate without
+ * Stable machine-readable codes so both ends discriminate without
  * string matching. Original failures travel through `cause` where useful.
  */
 

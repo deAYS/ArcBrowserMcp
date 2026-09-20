@@ -9,7 +9,7 @@ import { LARGE_RESPONSE_FRAME_MAX_BYTES, SMALL_FRAME_MAX_BYTES } from "./protoco
  * Stream-safe: never assumes one read equals one message. All bounds are
  * enforced before allocation-heavy work.
  *
- * Directional bounds (P08T): the same codec serves two payload classes, so
+ * Directional bounds: the same codec serves two payload classes, so
  * both the encoder and the decoder take an explicit direction role:
  * - "small": every request/command path plus all host->extension traffic
  *   (256 KiB). This is the default; passing no role can only ever produce

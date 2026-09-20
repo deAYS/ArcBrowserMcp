@@ -1,5 +1,5 @@
 /**
- * Extension-side bridge client (P03B transport scope only).
+ * Extension-side bridge client.
  *
  * Owns the long-lived chrome.runtime.connectNative port to
  * com.arc_mcp.bridge. Handles correlation for extension-answered requests
@@ -126,7 +126,7 @@ export class ExtensionBridge {
     this.failPending(new Error("bridge closed"));
   }
 
-  /** Extension-initiated request toward MCP (unused in P03B scope, kept tiny). */
+  /** Extension-initiated request toward MCP (kept tiny). */
   request(method: string, payload: Record<string, unknown> = {}, timeoutMs?: number): Promise<unknown> {
     const port = this.port;
     if (port === null) {

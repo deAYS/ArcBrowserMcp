@@ -16,7 +16,7 @@ const dist = path.join(root, "dist");
 
 await mkdir(path.join(dist, "diagnostic"), { recursive: true });
 
-// Deterministic content-derived build identity (P07): SHA-256 over sorted
+// Deterministic content-derived build identity: SHA-256 over sorted
 // relative path + file bytes of every extension input (never a timestamp),
 // so source-identical builds produce an identical buildId and bundle hash.
 const repoRoot = path.dirname(root);

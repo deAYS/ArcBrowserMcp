@@ -1,5 +1,5 @@
 /**
- * Pure console ring buffer + CDP event normalization for P09 (Node +
+ * Pure console ring buffer + CDP event normalization (Node +
  * extension, dependency-free).
  *
  * No Chrome/CDP/Node APIs here: callers supply already-extracted raw event
@@ -11,7 +11,7 @@
  * bounded type placeholders (never traversing properties, never calling
  * Runtime.getProperties), raw RemoteObject shapes/ids never appear in
  * output. Console text gets bounded heuristic redaction; structured
- * header/URL guarantees live in Redaction.ts (network side).
+ * header/URL handling lives in Redaction.ts (network side).
  */
 
 import {

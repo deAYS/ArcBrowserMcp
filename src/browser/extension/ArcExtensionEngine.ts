@@ -91,7 +91,7 @@ export interface ArcExtensionEngineOptions {
   readonly statusTimeoutMs?: number;
   readonly operationTimeoutMs?: number;
   readonly checkPrerequisites?: () => Promise<PrerequisiteIssue[]>;
-  /** P09 buffer capacities (finite; invalid values throw at operation time). */
+  /** Buffer capacities (finite; invalid values throw at operation time). */
   readonly consoleBufferEntries?: number;
   readonly networkBufferEntries?: number;
 }
@@ -99,7 +99,7 @@ export interface ArcExtensionEngineOptions {
 export const DEFAULT_EXTENSION_CONNECT_TIMEOUT_MS = 120_000;
 const DEFAULT_OPERATION_TIMEOUT_MS = 15_000;
 
-/** Schemes that must never be opened/created (P05 consolidates policy here). */
+/** Schemes that must never be opened/created. */
 const BLOCKED_CREATE_SCHEMES = ["javascript:", "data:", "file:", "chrome:", "chrome-extension:", "arc:", "devtools:", "view-source:"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -204,13 +204,10 @@ function asBrowserTab(value: unknown): BrowserTab {
 
 /**
  * Primary Windows backend: drives the normal running Arc session through
- * the proven P03B bridge (extension <- native host <- named pipe).
+ * the bridge (extension <- native host <- named pipe).
  *
  * Owns only the MCP side (pipe server, session descriptor, engine
- * lifetime). Never launches Arc, the native host, or anything browser-side;
- * the extension connects naturally through the P03B lifecycle. Only
- * connect/disconnect/status are functional in P03C; every future operation
- * is an explicit side-effect-free stub.
+ * lifetime). Never launches Arc, the native host, or anything browser-side.
  */
 export class ArcExtensionEngine implements BrowserEngine {
   private state: "disconnected" | "connecting" | "connected" | "error" = "disconnected";
@@ -367,11 +364,10 @@ export class ArcExtensionEngine implements BrowserEngine {
       await this.waitForRelay();
       // Transport health verification: the envelope version is validated
       // by the RPC layer and a non-ok answer rejects here. Retried on
-      // timeout (not just once): relay hosts cycle cleanly (P03B known
-      // issue) and a probe lost mid-cycle must not fail connect while a
-      // healthy relay is available. No browser behavior is exercised.
-      // Retries are bounded to a fraction of the connect timeout so the
-      // overall connect() deadline still holds.
+      // timeout: relay hosts cycle and a probe lost mid-cycle must not fail
+      // connect while a healthy relay is available. No browser behavior is
+      // exercised. Retries are bounded to a fraction of the connect timeout
+      // so the overall connect() deadline still holds.
       const verifyDeadline = Date.now() + Math.max(this.statusTimeoutMs(), Math.floor(timeoutMs() / 3));
       let verified = false;
       let lastError: unknown = null;
@@ -696,7 +692,7 @@ export class ArcExtensionEngine implements BrowserEngine {
       throw this.snapshotFailure(selectedTabId, error);
     }
     const result = this.asSnapshotResult(selectedTabId, payload);
-    // Defense in depth: raw CDP ids must never reach MCP output.
+    // Raw CDP ids must never reach MCP output.
     const leaked = findLeakedCdpKeys(result);
     if (leaked.length > 0) {
       throw browserSnapshotFailed(`extension response leaked internal ids (${leaked.join(",")})`);
@@ -1435,9 +1431,7 @@ export class ArcExtensionEngine implements BrowserEngine {
     return browserInteractionFailed(operation, error);
   }
 
-  // ------------------------------------------------------------------
-  // P09 observability (read-only; never invalidates refs, never mutates).
-  // ------------------------------------------------------------------
+  // Observability (read-only; never invalidates refs, never mutates).
 
   /** Resolve the configured console capacity (throws typed config error). */
   private consoleCapacity(): number {
@@ -1567,7 +1561,7 @@ export class ArcExtensionEngine implements BrowserEngine {
     return this.asNetworkClear(payload);
   }
 
-  /** Validate the console get envelope; defense-in-depth redaction Node-side. */
+  /** Validate the console get envelope; re-redact Node-side. */
   private asConsoleResult(selectedTabId: TabId, payload: unknown): ConsoleResult {
     if (!isRecord(payload)) {
       throw new BridgeError("INVALID_ENVELOPE", "malformed observability.consoleGet payload from the extension bridge");
@@ -1613,7 +1607,7 @@ export class ArcExtensionEngine implements BrowserEngine {
     if (leaked.length > 0) {
       throw browserObservabilityFailed("retrieve console", "INVALID_ENVELOPE");
     }
-    // Response budget defense-in-depth: the extension already budgets, but
+    // Response budget: the extension already budgets, but
     // Node re-checks the exact public envelope before MCP output.
     if (observabilityUtf8Length(JSON.stringify(result) ?? "") > OBSERVABILITY_MAX_SERIALIZED_BYTES) {
       throw browserObservabilityFailed("retrieve console", "RESPONSE_TOO_LARGE");
@@ -1687,7 +1681,7 @@ export class ArcExtensionEngine implements BrowserEngine {
     };
   }
 
-  /** Validate the network get envelope; defense-in-depth redaction Node-side. */
+  /** Validate the network get envelope; re-redact Node-side. */
   private asNetworkResult(selectedTabId: TabId, payload: unknown): NetworkResult {
     if (!isRecord(payload)) {
       throw new BridgeError("INVALID_ENVELOPE", "malformed observability.networkGet payload from the extension bridge");

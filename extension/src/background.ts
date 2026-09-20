@@ -13,7 +13,7 @@ import { validateNavigationUrl } from "../../src/browser/navigationPolicy.js";
 import type { TabsChrome } from "./tabs.js";
 
 /**
- * Manifest V3 service worker for the Arc MCP feasibility spike.
+ * Manifest V3 service worker.
  *
  * All listeners are registered synchronously at worker startup. Diagnostic
  * state for a single run lives in memory; the final report is persisted to
@@ -84,7 +84,7 @@ const api: ChromeApi = {
     sendCommand: (target, method, params) =>
       chrome.debugger.sendCommand(target, method, params) as Promise<Record<string, unknown>>,
     detach: (target) => chrome.debugger.detach(target),
-  // P09 debugger event routing lives inside the class; the adapter below
+  // Debugger event routing lives inside the class; the adapter below
   // forwards ONLY explicitly supported event methods for monitored tabs.
   onEvent: (listener) => {
     chrome.debugger.onEvent.addListener((source, method, params) => {
@@ -116,7 +116,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// P03B transport bridge: long-lived Native Messaging port owned by the
+// Transport bridge: long-lived Native Messaging port owned by the
 // extension, with bounded backoff reconnect. Answers only the transport
 // primitives (hello/ping/status); no browser business logic here.
 const bridge = new ExtensionBridge((hostName) => {
@@ -134,11 +134,11 @@ const bridge = new ExtensionBridge((hostName) => {
   };
 });
 
-// P04 tab management + P05 navigation: Chrome truth stays extension-side
-// in TabRegistry; Node receives project-owned records through explicit RPC.
+// Chrome truth stays extension-side in TabRegistry; Node receives
+// project-owned records through explicit RPC.
 // NOTE: exactly ONE onRemoteRequest registration may exist (bridge.ts
 // throws on a second). Transport primitives (bridge.ping/hello/status) are
-// answered first inside the single handler below so the P03B bridge always
+// answered first inside the single handler below so the bridge always
 // connects even if a later tabs/navigation branch throws.
 function toTabsChrome(): TabsChrome {
   const pick = (tab: chrome.tabs.Tab) => ({
@@ -199,11 +199,11 @@ function createRetiredStore() {
 
 const tabRegistry = new TabRegistry(createRetiredStore());
 
-// P06 snapshot capture: DebuggerSessionManager owns debugger attachment
+// Snapshot capture: DebuggerSessionManager owns debugger attachment
 // lifecycle + latest-snapshot-only refs. Chrome truth stays extension-side;
 // Node receives the semantic result through the typed snapshot.capture RPC.
-// Lazy persistent attachment (policy B): retained while the tab remains
-// useful so P07 interactions reuse the session; cleared on detach / tab
+// Lazy persistent attachment: retained while the tab remains
+// useful so interactions reuse the session; cleared on detach / tab
 // close / bridge shutdown. Worker suspension is safe: session storage
 // restores the session id so live refs survive suspension, while a real
 // restart mints a new session and old refs fail closed.
@@ -297,7 +297,7 @@ chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
 
 // Synchronous listener registration at worker startup (eager tombstoning).
 
-// P09 debugger event routing: ONE deliberate extension path. Supported
+// Debugger event routing: ONE extension path. Supported
 // observability events are normalized inside the manager; everything else
 // is ignored (never forwarded, never stored). Events from unmonitored tabs
 // are dropped by the manager's ownership/monitoring guards.
@@ -651,7 +651,7 @@ bridge.ensureConnected();
 
 // MV3 service workers suspend when idle, which kills setTimeout-based
 // retry. The repeating alarm below is the wake-safe reconnect safety net
-// (1 minute cadence): it guarantees a bounded reconnect attempt after MCP
+// (1 minute cadence): it retries the connection after MCP
 // restarts even when nobody is interacting with the extension. The alarms
 // permission exists solely for this reconnect schedule.
 const BRIDGE_RETRY_ALARM = "arc-mcp-bridge-retry";

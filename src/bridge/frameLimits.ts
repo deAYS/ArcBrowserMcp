@@ -1,5 +1,5 @@
 /**
- * Directional frame bounds (P08T). Dependency-free on purpose: the
+ * Directional frame bounds. Dependency-free on purpose: the
  * extension bundle imports this module, so no Node APIs and no other
  * project imports may appear here.
  *
@@ -33,7 +33,7 @@ export const MAX_BRIDGE_MESSAGE_BYTES = SMALL_FRAME_MAX_BYTES;
 export const LARGE_RESPONSE_FRAME_MAX_BYTES = 16 * 1024 * 1024;
 
 /**
- * Future P08 screenshot capability bound (8 MiB decoded PNG). Declared here
+ * Screenshot capability bound (8 MiB decoded PNG). Declared here
  * so transport and capability budgets stay consistent.
  */
 export const SCREENSHOT_MAX_DECODED_BYTES = 8 * 1024 * 1024;

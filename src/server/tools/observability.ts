@@ -108,7 +108,7 @@ const ObservabilityInputSchema = z.object({
 });
 
 /**
- * P09 observability registration. Both tools act only on the logically
+ * Observability registration. Both tools act only on the logically
  * selected tab through BrowserService; there are no tabId, CDP, selector,
  * or event parameters. Read-only for the page: get/clear never navigate,
  * reload, mutate, or invalidate snapshot refs.

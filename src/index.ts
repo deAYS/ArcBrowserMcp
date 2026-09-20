@@ -10,11 +10,10 @@ import { BridgeError } from "./bridge/BridgeError.js";
 import { createShutdownHandler, startStdioServer } from "./server/transport.js";
 
 /**
- * Production entry point (extension-primary backend): construct the bridge
+ * Production entry point (extension backend): construct the bridge
  * runtime and ArcExtensionEngine, connect (bounded wait for the running
  * Arc extension), then serve MCP. Browser startup failure is fatal (typed
- * diagnostic + non-zero exit) rather than a fake connected state. No
- * retry/recovery loops here; those belong to P10.
+ * diagnostic + non-zero exit) rather than a fake connected state.
  */
 async function main(): Promise<void> {
   const config = loadConfig();

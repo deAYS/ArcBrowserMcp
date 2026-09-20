@@ -1,7 +1,7 @@
 /**
- * Typed errors for Arc discovery, launch, and CDP connection (P02/P03).
+ * Typed errors for Arc discovery, launch, and CDP connection.
  *
- * Minimal on purpose: the full P10 error taxonomy arrives later. Every error
+ * Minimal on purpose. Every error
  * carries a stable machine-readable code so callers never match on message
  * strings, plus an actionable human-readable message and safe details.
  * Original failures are retained through `cause` where available.
@@ -143,7 +143,7 @@ export function cdpNoContext(): ArcError {
   );
 }
 
-/** A BrowserEngine operation from a future phase was invoked. */
+/** A BrowserEngine operation with no backend implementation was invoked. */
 export function browserOperationNotImplemented(operation: string): ArcError {
   return new ArcError(
     "BROWSER_OPERATION_NOT_IMPLEMENTED",

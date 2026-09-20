@@ -1,5 +1,5 @@
 /**
- * Extension-side snapshot capture for P06 (DOM-free, no global chrome use).
+ * Extension-side snapshot capture (DOM-free, no global chrome use).
  *
  * Owns the debugger lifecycle for page inspection through the small
  * DebuggerSessionManager below:
@@ -15,10 +15,10 @@
  * snapshotSemantics module. Bounded DOM.describeNode supplementation is
  * used ONLY to positively classify value-bearing editable controls
  * (fail-closed value redaction), never for markup scraping.
- * P08 adds two fixed paths on the same manager (never generic CDP):
+ * Two fixed page-tool paths exist on the same manager (never generic CDP):
  * runtime.evaluate (browser_evaluate) and page.screenshot
  * (browser_screenshot, viewport PNG).
- * P09 adds bounded console/network observability on the same manager
+ * Bounded console/network observability lives on the same manager
  * (never a second ownership system): Runtime.enable for console events,
  * Network.enable for network events, routed through ONE chrome.debugger
  * onEvent path. Raw events never cross the bridge; only sanitized,
@@ -27,7 +27,7 @@
  * chrome.storage).
  *
  * about:blank policy (deterministic): treated as NOT controllable, matching
- * the P04 isControllableUrl rule (only http:/https: are controllable).
+ * the isControllableUrl rule (only http:/https: are controllable).
  *
  * Reference model: latest-snapshot-only. Each successful capture replaces
  * the tab's ref table; earlier refs fail closed. Refs are opaque
@@ -89,10 +89,10 @@ import { redactConsoleText, sanitizeUrl } from "../../src/security/Redaction.js"
 export const DEBUG_PROTOCOL_VERSION = "1.3";
 
 /**
- * Allowlisted CDP methods for P06 snapshots + P07 interactions + P08
- * page tools + P09 observability. Nothing else may be sent.
+ * Allowlisted CDP methods for snapshots + interactions +
+ * page tools + observability. Nothing else may be sent.
  *
- * P08 intentionally unlocks two more fixed methods, each reachable ONLY
+ * Two more fixed methods exist, each reachable ONLY
  * through its explicit bridge method:
  * - Runtime.evaluate: ONLY the runtime.evaluate path (browser_evaluate).
  *   Never snapshot, never interactions, never wait, never screenshot,
@@ -101,7 +101,7 @@ export const DEBUG_PROTOCOL_VERSION = "1.3";
  *   (browser_screenshot, viewport PNG). Page.enable is NOT allowlisted:
  *   Chromium does not require it for captureScreenshot.
  *
- * P09 adds two narrow observability capabilities, each reachable ONLY
+ * Two narrow observability capabilities exist, each reachable ONLY
  * through its explicit bridge method:
  * - observability-console: Runtime.enable ONLY (browser_console get/clear).
  *   Events (Runtime.consoleAPICalled, Runtime.exceptionThrown) arrive via
@@ -125,7 +125,7 @@ export const CDP_CAPABILITY_METHODS = Object.freeze({
   // editable-value classification snapshots use (DOM.describeNode probes),
   // so DOM.enable/describeNode are genuinely required here too.
   wait: Object.freeze(["Accessibility.enable", "Accessibility.getFullAXTree", "DOM.enable", "DOM.describeNode"] as const),
-  // P09 observability: console needs Runtime.enable only; network needs
+  // Observability: console needs Runtime.enable only; network needs
   // Network.enable only. Event traffic is onEvent-routed, never a command.
   "observability-console": Object.freeze(["Runtime.enable"] as const),
   "observability-network": Object.freeze(["Network.enable"] as const),
@@ -301,7 +301,7 @@ export class DebuggerSessionManager {
   private readonly owned = new Set<number>();
   private readonly entries = new Map<number, TabSnapshotEntry>();
   /**
-   * Owned-session lifecycle per Chrome tab id (P08 timeout retirement).
+   * Owned-session lifecycle per Chrome tab id.
    *
    * DETACHED:  no BrowserMcp-owned attachment; lazy attach allowed.
    * OWNED:     attachment positively owned by this manager; reusable.
@@ -482,7 +482,7 @@ export class DebuggerSessionManager {
     return this.owned.size;
   }
 
-  /** Latest-snapshot-only validity check (P07 will consume refs; P06 owns lifecycle). */
+  /** Latest-snapshot-only validity check. */
   isRefValid(projectTabId: string, ref: string): boolean {
     if (!ELEMENT_REF_PATTERN.test(ref)) {
       return false;
@@ -495,7 +495,7 @@ export class DebuggerSessionManager {
     return false;
   }
 
-  /** Backend node id behind a live latest-snapshot ref (P07 geometry/focus). */
+  /** Backend node id behind a live latest-snapshot ref. */
   backendNodeIdForRef(projectTabId: string, ref: string): number | null {
     if (!ELEMENT_REF_PATTERN.test(ref)) {
       return null;
@@ -779,14 +779,12 @@ export class DebuggerSessionManager {
     return new SnapshotError("TAB_NOT_FOUND", `tab ${JSON.stringify(projectTabId)} no longer exists`);
   }
 
-  // ------------------------------------------------------------------
-  // P07 element interactions. Every operation resolves its opaque
+  // Element interactions. Every operation resolves its opaque
   // latest-snapshot-only ref extension-side (never by Node-supplied CDP
   // ids), reuses the owned debugger session (never steals a foreign one),
   // and sends only allowlisted DOM/Input/Accessibility commands (never
   // Runtime). Mutating successes invalidate the tab's refs; pure reads do
   // not. Failures before any input dispatch leave refs untouched.
-  // ------------------------------------------------------------------
 
   /**
    * Shared interaction preamble: selected project tab match, live latest
@@ -909,9 +907,8 @@ export class DebuggerSessionManager {
       return true;
     }
     if (info.nodeName === "input" && info.type !== null) {
-      // P07 text-entry semantics: text-like types only. input[type=number]
-      // is NOT an approved fill/type target (sanitization/invalid-character
-      // behavior is not uniform enough for this phase) and falls through to
+      // Text-entry semantics: text-like types only. input[type=number]
+      // is NOT an approved fill/type target and falls through to
       // the typed ELEMENT_NOT_EDITABLE error.
       return (
         info.type === "text" ||
@@ -1167,7 +1164,7 @@ export class DebuggerSessionManager {
    * Fresh semantic read of a live element (read-only: never invalidates).
    * Prefers Accessibility.getPartialAXTree on the internal backend node;
    * falls back to getFullAXTree + internal lookup. Password/protected /
-   * uncertain editable values stay redacted under the P06 fail-closed
+   * uncertain editable values stay redacted under the fail-closed
    * model.
    */
   async getElementText(
@@ -1387,7 +1384,7 @@ export class DebuggerSessionManager {
    * failures, missing/non-record describe results, unknown editable/input
    * types, and missing backend ids are all absent from the map, and the
    * normalizer redacts every such value. The credential-name heuristic in
-   * the normalizer remains defense in depth only.
+   * the normalizer remains a second layer only.
    */
   private async classifyEditableValues(
     chromeId: number,
@@ -1502,10 +1499,8 @@ export class DebuggerSessionManager {
     );
   }
 
-  // ------------------------------------------------------------------
-  // P08 page tools. Each is reachable only through its explicit bridge
+  // Page tools. Each is reachable only through its explicit bridge
   // method; there is no generic CDP surface anywhere.
-  // ------------------------------------------------------------------
 
   /** Resolve the selected project tab to (chromeId, record); pre-attach gates. */
   private async resolveSelectedTab(projectTabId: string): Promise<{ chromeId: number; record: SnapshotTabRecord }> {
@@ -1526,7 +1521,7 @@ export class DebuggerSessionManager {
   }
 
   /**
-   * Evaluate page JavaScript in the selected controllable tab (P08).
+   * Evaluate page JavaScript in the selected controllable tab.
    *
    * Fixed Runtime.evaluate call (awaitPromise + returnByValue, no user
    * gesture, no command-line API, native timeout guard); the expression
@@ -1616,7 +1611,7 @@ export class DebuggerSessionManager {
   }
 
   /**
-   * Viewport-only PNG screenshot (P08, read-only: never invalidates refs).
+   * Viewport-only PNG screenshot (read-only: never invalidates refs).
    * Fixed Page.captureScreenshot parameters; Page.enable is not used.
    */
   async captureScreenshot(projectTabId: string): Promise<{ mimeType: "image/png"; data: string }> {
@@ -1840,7 +1835,7 @@ export class DebuggerSessionManager {
   }
 
   /**
-   * Read-only semantic text corpus for wait-for-text polling (P08).
+   * Read-only semantic text corpus for wait-for-text polling.
    *
    * Dedicated Accessibility inspection that never allocates refs and never
    * touches the latest-snapshot ref table. Applies the same fail-closed
@@ -1921,7 +1916,7 @@ export class DebuggerSessionManager {
   }
 
   /**
-   * One atomic read-only wait poll against browser truth (P08).
+   * One atomic read-only wait poll against browser truth.
    *
    * Node owns the deadline loop and selection-stability checks; the
    * extension answers a single poll with no sleep, no JS, no snapshotId,
@@ -1992,14 +1987,12 @@ export class DebuggerSessionManager {
     return { url: record.url, title: record.title, status: this.tabStatus(chromeId) };
   }
 
-  // ------------------------------------------------------------------
-  // P09 console/network observability. Same manager, same ownership model,
+  // Console/network observability. Same manager, same ownership model,
   // same RETIRING/UNCERTAIN discipline as every other debugger path above:
   // get ensures monitoring (attach + domain enable) for the selected
   // controllable tab; clear empties that tab's buffer without touching the
   // page, refs, or any foreign debugger. Raw debugger events never cross
   // the bridge; only sanitized, redacted, bounded project-owned entries do.
-  // ------------------------------------------------------------------
 
   /** Per-tab observability state (in-memory; worker restart resets). */
   private readonly observability = new Map<
@@ -2097,7 +2090,7 @@ export class DebuggerSessionManager {
     return state === undefined ? null : { consoleEnabled: state.consoleEnabled, networkEnabled: state.networkEnabled };
   }
 
-  /** Route one chrome.debugger.onEvent delivery to the P09 monitors. */
+  /** Route one chrome.debugger.onEvent delivery to the monitors. */
   handleDebuggerEvent(chromeId: number | undefined, method: string, params: Record<string, unknown> | undefined): void {
     if (chromeId === undefined) {
       return;
@@ -2304,7 +2297,7 @@ export class DebuggerSessionManager {
   }
 
   /**
-   * Ensure console monitoring for the selected controllable tab (P09 get).
+   * Ensure console monitoring for the selected controllable tab.
    * Attaches through the normal manager (never steals), enables
    * Runtime.enable once per attachment, applies the requested capacity
    * (clamped to the hard max), and returns the public state. Read-only for
@@ -2341,7 +2334,7 @@ export class DebuggerSessionManager {
   }
 
   /**
-   * Ensure network monitoring for the selected controllable tab (P09 get).
+   * Ensure network monitoring for the selected controllable tab.
    * Same ownership discipline as console; enables Network.enable once per
    * attachment. Read-only for the page.
    */
@@ -2427,7 +2420,7 @@ export class DebuggerSessionManager {
         fitted = [];
       }
     }
-    // Defense in depth: console text was already redacted at ingestion; run
+    // Console text was already redacted at ingestion; run
     // the heuristic once more on the way out (bounded, idempotent).
     const entries = fitted.map((entry) => ({
       ...entry,
@@ -2777,7 +2770,7 @@ export function hasPngSignature(decoded: Uint8Array | number[]): boolean {
 }
 
 /**
- * Wait corpus text for one AX node under the P06 fail-closed value model.
+ * Wait corpus text for one AX node under the fail-closed value model.
  * Editable values enter the corpus ONLY when positively classified safe
  * (same valueSafety map snapshots use); password/unknown/unprobed values
  * contribute their accessible NAME at most, never the secret-bearing value.

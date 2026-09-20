@@ -5,9 +5,8 @@ import { assertSafeProfilePath, resolveProfilePath } from "./ArcProfile.js";
 /**
  * Arc launch configuration builder (data only).
  *
- * P02 constructs and validates the configuration P03 will need; it never
- * spawns a process. Whether Arc accepts these arguments is P03's
- * verification job — this module makes no such claim.
+ * Constructs and validates the configuration; it never
+ * spawns a process.
  */
 
 export interface ArcLaunchConfigInput {

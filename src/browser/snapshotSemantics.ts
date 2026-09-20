@@ -1,18 +1,17 @@
 /**
- * Shared snapshot semantics for P06 (Node + extension, dependency-free).
+ * Shared snapshot semantics (Node + extension, dependency-free).
  *
  * This module owns the browser-neutral snapshot model: Accessibility-tree
  * normalization, compact text rendering, size bounds, opaque-ref syntax
  * validation, and the raw-CDP-leak scanner. It never touches chrome.*,
  * Node APIs, or the bridge, so the extension bundle can import it directly
- * (same precedent as navigationPolicy.ts) and unit tests run without a
+ * and unit tests run without a
  * browser.
  *
- * Design decisions (P06):
  * - Accessibility semantics are authoritative; raw HTML is never used and
  *   Runtime.evaluate is never needed.
  * - about:blank is deterministically NOT controllable (matches the
- *   isControllableUrl rule used by P04/P05).
+ *   isControllableUrl rule).
  * - Latest-snapshot-only references: each successful capture invalidates
  *   earlier element refs for that tab (enforced extension-side in
  *   snapshot.ts; the syntax helpers here only validate shape).
@@ -118,7 +117,7 @@ export interface NormalizeOptions {
    *   This covers describeNode failure, probe-budget exhaustion, missing
    *   backend node ids, and ambiguous editable/input types.
    *
-   * Credential-name heuristics are defense in depth only, never the
+   * Credential-name heuristics are a second layer only, never the
    * primary boundary: even a benign-looking name with unknown status is
    * redacted above.
    */

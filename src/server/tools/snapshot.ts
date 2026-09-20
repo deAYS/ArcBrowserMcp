@@ -59,7 +59,7 @@ async function callTool<T>(action: () => Promise<T>): Promise<
 }
 
 /**
- * Snapshot tool registration (P06, read-only). Acts only on the logically
+ * Snapshot tool registration (read-only). Acts only on the logically
  * selected tab; depends solely on BrowserService. No tabId, no CDP
  * parameters, no raw Chrome/CDP ids.
  */

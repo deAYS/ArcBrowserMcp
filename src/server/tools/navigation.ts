@@ -56,7 +56,7 @@ async function callTool<T>(action: () => Promise<T>): Promise<
 }
 
 /**
- * Navigation tool registration (P05). Tools operate on the logically
+ * Navigation tool registration. Tools operate on the logically
  * selected tab only and depend solely on BrowserService.
  */
 export function registerNavigationTools(server: McpServer, services: NavigationToolServices): void {

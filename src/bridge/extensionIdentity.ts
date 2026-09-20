@@ -14,8 +14,7 @@ export interface ExtensionIdentity {
  * Derive a Chromium extension ID from a base64 SPKI public key.
  *
  * Chromium algorithm: SHA-256 over the DER bytes, first 128 bits mapped
- * nibble-by-nibble onto [a-p]. Verified against the real Arc load (>= P03B
- * real test); do not "improve" this mapping.
+ * nibble-by-nibble onto [a-p]. Do not "improve" this mapping.
  */
 export function extensionIdFromPublicKeyBase64(publicKeyBase64: string): string {
   const der = Buffer.from(publicKeyBase64.trim(), "base64");

@@ -1,5 +1,5 @@
 /**
- * Shared interaction policy for P07 (Node + extension, dependency-free).
+ * Shared interaction policy (Node + extension, dependency-free).
  *
  * Owns the browser-neutral interaction boundaries so both sides enforce the
  * same contract without duplicating magic values:

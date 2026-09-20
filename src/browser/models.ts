@@ -2,9 +2,7 @@
  * Shared browser-domain models owned by this project.
  *
  * These types are intentionally backend-agnostic: no Playwright, CDP,
- * Chrome, or Arc-specific library types may appear here. Later phases
- * (snapshots, observability, recovery) will extend these models without
- * breaking the BrowserEngine contract.
+ * Chrome, or Arc-specific library types may appear here.
  */
 
 /** Stable identifier for a browser tab managed by the MCP server. */
@@ -12,7 +10,6 @@ export type TabId = string;
 
 /**
  * Opaque reference to an actionable element from a page snapshot.
- * P02 defines only the alias; P06 (RefRegistry) defines resolution semantics.
  */
 export type ElementRef = string;
 
@@ -50,8 +47,7 @@ export interface BrowserTab {
   /**
    * Whether normal page-control operations are expected to work against
    * this tab. Deterministic rule: normal http/https pages are controllable;
-   * browser-internal schemes are listed but flagged otherwise (P05/P06
-   * will rely on this rather than rediscovering it).
+   * browser-internal schemes are listed but flagged otherwise.
    */
   readonly controllable: boolean;
 }
@@ -74,7 +70,7 @@ export interface NavigateResult {
 }
 
 export interface SnapshotNode {
-  /** Project-owned opaque element ref (P07 input); absent for static text. */
+  /** Project-owned opaque element ref; absent for static text. */
   readonly ref?: string;
   readonly role: string;
   readonly name?: string;
@@ -118,9 +114,8 @@ export interface ElementTextResult {
 
 export interface ScreenshotOptions {
   /**
-   * P08 supports viewport capture only. Requesting fullPage: true is
-   * rejected (BROWSER_SCREENSHOT_FAILED); the field exists so future
-   * phases can extend without breaking the contract.
+   * Viewport capture only. Requesting fullPage: true is
+   * rejected (BROWSER_SCREENSHOT_FAILED).
    */
   readonly fullPage?: boolean;
 }
@@ -130,14 +125,14 @@ export interface ScreenshotResult {
   readonly dataBase64: string;
 }
 
-/** Options for browser_evaluate (P08). Timeout is bounded by policy. */
+/** Options for browser_evaluate. Timeout is bounded by policy. */
 export interface EvaluateOptions {
   /** Per-evaluation deadline in ms; default 5000, hard max 10000. */
   readonly timeoutMs?: number;
 }
 
 /**
- * Project-owned by-value evaluation result (P08).
+ * Project-owned by-value evaluation result.
  *
  * Arbitrary page JS can produce values JSON cannot represent, so the
  * envelope distinguishes plain JSON-compatible results from special JS
@@ -167,7 +162,7 @@ export interface EvaluateResult {
 }
 
 /**
- * Bounded semantic wait conditions (P08). No arbitrary JS polling:
+ * Bounded semantic wait conditions. No arbitrary JS polling:
  * load/url/title resolve against authoritative tab metadata, text
  * resolves against a dedicated read-only Accessibility inspection that
  * never allocates snapshot refs. Matching is case-sensitive and

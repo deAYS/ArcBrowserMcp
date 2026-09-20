@@ -22,7 +22,7 @@ import { browserOperationNotImplemented, browserTabNotFound } from "../errors/Ar
  *
  * The MCP layer depends only on this service, never on Playwright,
  * ArcLauncher, CDP, child processes, bridge RPC, or chrome.*: MCP tool ->
- * BrowserService -> BrowserEngine. Without an engine (P01 fixtures) status
+ * BrowserService -> BrowserEngine. Without an engine status
  * reports the long-standing disconnected placeholder, and tab operations
  * report not-implemented rather than failing obscurely.
  */
@@ -113,83 +113,83 @@ export class BrowserService {
     return this.navigationSnapshot("reload", before.selectedTabId, engine);
   }
 
-  /** Semantic Accessibility snapshot of the selected tab (P06, read-only). */
+  /** Semantic Accessibility snapshot of the selected tab (read-only). */
   async snapshot(options?: SnapshotOptions): Promise<SnapshotResult> {
     const engine = this.requireEngine("snapshot");
     return options === undefined ? engine.snapshot() : engine.snapshot(options);
   }
 
-  /** Click a live snapshot ref on the selected tab (P07, invalidates refs). */
+  /** Click a live snapshot ref on the selected tab (invalidates refs). */
   async click(ref: string): Promise<{ accepted: true }> {
     const engine = this.requireEngine("click");
     await engine.click(ref);
     return { accepted: true };
   }
 
-  /** Replace an editable control's text (P07, invalidates refs). */
+  /** Replace an editable control's text (invalidates refs). */
   async fill(ref: string, text: string): Promise<{ accepted: true }> {
     const engine = this.requireEngine("fill");
     await engine.fill(ref, text);
     return { accepted: true };
   }
 
-  /** Insert text at the caret without clearing (P07, invalidates refs). */
+  /** Insert text at the caret without clearing (invalidates refs). */
   async type(ref: string, text: string): Promise<{ accepted: true }> {
     const engine = this.requireEngine("type");
     await engine.type(ref, text);
     return { accepted: true };
   }
 
-  /** Dispatch a supported key/chord to the selected tab (P07). */
+  /** Dispatch a supported key/chord to the selected tab. */
   async pressKey(key: string): Promise<{ accepted: true }> {
     const engine = this.requireEngine("pressKey");
     await engine.pressKey(key);
     return { accepted: true };
   }
 
-  /** Fresh semantic read of a live ref (P07, read-only, keeps refs). */
+  /** Fresh semantic read of a live ref (read-only, keeps refs). */
   async getText(ref: string): Promise<{ text: string }> {
     const engine = this.requireEngine("getText");
     return { text: await engine.getText(ref) };
   }
 
-  /** Evaluate page JS in the selected tab (P08; dispatched evaluate invalidates refs). */
+  /** Evaluate page JS in the selected tab (dispatched evaluate invalidates refs). */
   async evaluate(expression: string, options?: EvaluateOptions): Promise<EvaluateResult> {
     const engine = this.requireEngine("evaluate");
     return options === undefined ? engine.evaluate(expression) : engine.evaluate(expression, options);
   }
 
-  /** Viewport-only PNG screenshot of the selected tab (P08, read-only). */
+  /** Viewport-only PNG screenshot of the selected tab (read-only). */
   async screenshot(): Promise<ScreenshotResult> {
     const engine = this.requireEngine("screenshot");
     return engine.screenshot();
   }
 
-  /** Bounded semantic wait on the selected tab (P08, read-only). */
+  /** Bounded semantic wait on the selected tab (read-only). */
   async waitFor(condition: WaitCondition): Promise<WaitResult> {
     const engine = this.requireEngine("waitFor");
     return engine.waitFor(condition);
   }
 
-  /** Bounded console entries for the selected tab (P09, read-only). */
+  /** Bounded console entries for the selected tab (read-only). */
   async getConsole(limit?: number): Promise<ConsoleResult> {
     const engine = this.requireEngine("getConsole");
     return limit === undefined ? engine.getConsole() : engine.getConsole(limit);
   }
 
-  /** Clear the selected tab's console buffer (P09, read-only page-wise). */
+  /** Clear the selected tab's console buffer (read-only page-wise). */
   async clearConsole(): Promise<ConsoleClearResult> {
     const engine = this.requireEngine("clearConsole");
     return engine.clearConsole();
   }
 
-  /** Bounded network metadata for the selected tab (P09, read-only). */
+  /** Bounded network metadata for the selected tab (read-only). */
   async getNetwork(limit?: number): Promise<NetworkResult> {
     const engine = this.requireEngine("getNetwork");
     return limit === undefined ? engine.getNetwork() : engine.getNetwork(limit);
   }
 
-  /** Clear the selected tab's network buffer (P09, read-only page-wise). */
+  /** Clear the selected tab's network buffer (read-only page-wise). */
   async clearNetwork(): Promise<NetworkClearResult> {
     const engine = this.requireEngine("clearNetwork");
     return engine.clearNetwork();

@@ -1,5 +1,5 @@
 /**
- * Extension-side tab registry for P04 (DOM-free, no global chrome use).
+ * Extension-side tab registry (DOM-free, no global chrome use).
  *
  * Public project IDs embed an opaque session epoch: `t-<epoch>-<chromeId>`
  * (plus `-r<n>` on same-epoch numeric reuse). The epoch is 128-bit
@@ -422,7 +422,7 @@ export class TabRegistry {
   /**
    * Navigate the project tab to a validated absolute URL. The caller has
    * already passed shared URL policy; the extension revalidates before
-   * touching chrome.tabs (defense in depth). Returns accepted-request
+   * touching chrome.tabs. Returns accepted-request
    * metadata, NOT a load guarantee.
    */
   async navigateTab(

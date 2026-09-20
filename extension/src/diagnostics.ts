@@ -8,7 +8,7 @@ import type {
 } from "./types.js";
 
 /**
- * Browser-side feasibility orchestration for arc-mcp (P03E spike).
+ * Browser-side feasibility orchestration for arc-mcp.
  *
  * Uses ONLY a dedicated disposable test tab created by the runner: it never
  * touches the user's existing tabs. Every step records pass/fail plus safe
@@ -21,9 +21,8 @@ import type {
 
 export const TEST_URL = "https://example.com/";
 /**
- * Single explicitly approved debugger protocol probe (P03E correction).
- * The initial "0.1" probe was rejected by Arc as unsupported; the reviewer
- * authorized exactly "1.3". No fallback probing of any kind.
+ * Single debugger protocol version. "1.3" is the only version probed;
+ * no fallback probing of any kind.
  */
 export const DEBUG_PROTOCOL_VERSION = "1.3";
 const NETWORK_COLLECT_TIMEOUT_MS = 12_000;
@@ -507,7 +506,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
  * SUPPORTED requires the full mandatory set: tabs create/query/update/remove,
  * debugger attach/detach, and Runtime, DOM, Accessibility, Page, Network,
  * Input. DOMSnapshot, screenshot, Target, and Storage are desirable-only and
- * reported individually for reviewer judgment.
+ * reported individually.
  */
 export function computeVerdict(matrix: CapabilityMatrix): "SUPPORTED" | "BLOCKED" {
   const required: CheckStatus[] = [

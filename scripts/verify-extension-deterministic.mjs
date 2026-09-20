@@ -1,5 +1,5 @@
 /**
- * Deterministic-build verification (P07 prelive gate).
+ * Deterministic-build verification.
  *
  * Runs extension/build.mjs twice with no source changes and asserts:
  * - buildId #1 == buildId #2

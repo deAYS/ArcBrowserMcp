@@ -1,5 +1,5 @@
 /**
- * Shared P09 observability policy (Node + extension, dependency-free).
+ * Shared observability policy (Node + extension, dependency-free).
  *
  * Owns the browser-neutral observability boundaries so both sides enforce
  * the same contract without duplicating magic values:

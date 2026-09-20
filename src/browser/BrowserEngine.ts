@@ -22,8 +22,7 @@ import type {
 /**
  * Backend-agnostic browser contract consumed by BrowserService.
  *
- * P02 defines the contract only; CdpBrowserEngine (P03) and any future
- * extension backend implement it. Method signatures use project-owned
+ * Method signatures use project-owned
  * request/result models so backends can be added without rewriting this
  * interface. Nothing here may reference Playwright, CDP, or Arc APIs.
  */

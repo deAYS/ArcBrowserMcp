@@ -1,5 +1,5 @@
 /**
- * Real-Arc bridge live test driver (P03B acceptance, opt-in only).
+ * Real-Arc bridge live test driver (opt-in only).
  *
  *  1. Starts the MCP named-pipe bridge (real session descriptor + nonce).
  *  2. Waits for the Arc-launched native host to authenticate (bounded).
@@ -11,7 +11,7 @@
  *  8. Sends bridge.ping #3, stops, prints machine-readable evidence JSON.
  *
  * No user tabs are touched; no debugger attachment is used. Never prints
- * the session nonce. Exit 0 only when every phase passes.
+ * the session nonce. Exit 0 only when every step passes.
  */
 import { execFile } from "node:child_process";
 import * as fs from "node:fs";
@@ -194,7 +194,7 @@ async function main() {
   const pipeName = bridgePipeName(process.env.USERNAME);
   const sessionDir = defaultSessionDir();
 
-  // Phase 1: start MCP bridge, wait for authenticated relay.
+  // Step 1: start MCP bridge, wait for authenticated relay.
   let server = new McpPipeServer({ pipeName, sessionDir, logger: verboseLogger });
   await server.start();
   try {
@@ -205,7 +205,7 @@ async function main() {
   }
   note("relay-connect", true, { pipeName });
 
-  // Phase 2: snapshot processes immediately (the intermediate cmd.exe
+  // Step 2: snapshot processes immediately (the intermediate cmd.exe
   // wrapper is transient) and read host journal argv lines for this run.
   // Process ancestry is best-effort evidence, never a hard gate: the
   // transport criteria below decide pass/fail.
@@ -213,14 +213,14 @@ async function main() {
   const snap1 = await findBridgeProcesses().catch((error) => ({ error: String(error?.message ?? error) }));
   evidence.hostSnapshotAtRelay = snap1;
 
-  // Phase 3: correlated ping #1.
+  // Step 3: correlated ping #1.
   const t0 = Date.now();
   const first = await server.requestDetailed("bridge.ping", {}, PING_TIMEOUT_MS);
   const latencyMs = Date.now() - t0;
   evidence.ping1 = { requestId: first.id, responseId: first.id, latencyMs, payload: first.payload };
   note("ping-1", true, { requestId: first.id, latencyMs });
 
-  // Phase 4: second snapshot + journal argv corroboration.
+  // Step 4: second snapshot + journal argv corroboration.
   const snap2 = await findBridgeProcesses().catch((error) => ({ error: String(error?.message ?? error) }));
   const journalArgv = readJournalArgvSince(sessionDir, runStartIso);
   evidence.hostProcess = { atRelay: snap1, afterPing: snap2, journalArgv };
@@ -232,7 +232,7 @@ async function main() {
     journalLaunches: journalArgv.length,
   });
 
-  // Phase 4: wrong-nonce client is rejected; legitimate path unaffected.
+  // Wrong-nonce client is rejected; legitimate path unaffected.
   const negative = await wrongNonceHello(pipeName);
   evidence.negativeAuth = negative;
   if (!negative.rejected) {
@@ -244,7 +244,7 @@ async function main() {
   evidence.ping2 = { requestId: second.id, responseId: second.id, payload: second.payload };
   note("ping-2-after-negative", true, { requestId: second.id });
 
-  // Phase 5: restart recovery.
+  // Step 5: restart recovery.
   await server.stop();
   const stoppedAt = Date.now();
   server = new McpPipeServer({ pipeName, sessionDir, logger: verboseLogger });

@@ -49,12 +49,12 @@ export interface CdpEngineDeps {
 const GRACEFUL_CLOSE_TIMEOUT_MS = 10_000;
 
 /**
- * BrowserEngine backend for the dedicated Arc process over CDP (P03).
+ * BrowserEngine backend for the dedicated Arc process over CDP.
  *
  * Owns launcher, readiness, and connection lifecycle. Only connect,
- * disconnect, and status are functional; every future-phase operation is an
+ * disconnect, and status are functional; every other operation is an
  * explicit side-effect-free not-implemented stub so the public contract
- * never changes shape for P04+.
+ * never changes shape.
  */
 export class CdpBrowserEngine implements BrowserEngine {
   private state: "disconnected" | "connecting" | "connected" | "error" = "disconnected";

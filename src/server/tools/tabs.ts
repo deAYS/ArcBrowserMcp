@@ -58,7 +58,7 @@ async function callTool<T>(action: () => Promise<T>): Promise<
 }
 
 /**
- * Tab tool registration (P04). MCP tools depend only on BrowserService;
+ * Tab tool registration. MCP tools depend only on BrowserService;
  * bridge method names and Chrome IDs never appear here.
  */
 export function registerTabsTools(server: McpServer, services: TabsToolServices): void {

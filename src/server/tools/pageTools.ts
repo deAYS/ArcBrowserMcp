@@ -66,7 +66,7 @@ const WaitConditionSchema = z.union([
 ]);
 
 /**
- * P08 page-tool registration. Every tool acts only on the logically
+ * Page-tool registration. Every tool acts only on the logically
  * selected tab through BrowserService; there are no tabId, CDP, selector,
  * or script-context parameters. Screenshot returns proper MCP image
  * content ({ type: "image", data, mimeType }) — never raw base64 as the

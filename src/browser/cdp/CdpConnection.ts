@@ -11,8 +11,7 @@ export interface CdpConnectionDeps {
  * Playwright CDP attachment for one dedicated Arc instance.
  *
  * Playwright types never leave this module: consumers see only connection
- * state, context counts, and typed errors. No tabs/pages are created here;
- * P04 owns page management.
+ * state, context counts, and typed errors. No tabs/pages are created here.
  */
 export class CdpConnection {
   private browser: Browser | null = null;

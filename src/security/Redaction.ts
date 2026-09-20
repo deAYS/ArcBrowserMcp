@@ -1,19 +1,19 @@
 /**
- * Central redaction for P09 console/network observability (Node + extension,
+ * Central redaction for console/network observability (Node + extension,
  * dependency-free).
  *
  * Pure and deterministic: no Node APIs, no chrome.*, no randomness, no
  * timestamps. Used as close to the raw event boundary as practical
  * (extension-side) so credentials are redacted BEFORE crossing the
- * extension/native-host/pipe boundary. Node re-applies the same helpers as
- * defense-in-depth before MCP output.
+ * extension/native-host/pipe boundary. Node re-applies the same helpers
+ * before MCP output.
  *
- * Guarantees (strict):
+ * Strict header/URL handling:
  * - Structured header values for Authorization, Cookie, Set-Cookie,
  *   Proxy-Authorization (case-insensitive) are ALWAYS replaced wholesale
  *   with "[REDACTED]". No prefix preservation (never "Bearer abc...").
  * - Additional credential headers X-Api-Key / X-Auth-Token are also
- *   redacted centrally (encouraged by the phase spec).
+ *   redacted centrally.
  * - URL query values for sensitive parameter names are replaced, embedded
  *   username/password credentials are stripped, unparseable URLs use a
  *   bounded conservative fallback.
@@ -21,8 +21,8 @@
  * Heuristic (best-effort, documented as imperfect):
  * - Arbitrary console text gets bounded pattern redaction for obvious
  *   credential forms (Bearer/Basic + key=value shapes). The strict header/URL
- *   guarantee above remains the security boundary; console heuristics are
- *   defense-in-depth only.
+ *   handling above remains the security boundary; console heuristics are
+ *   a second layer only.
  */
 
 export const REDACTED_VALUE = "[REDACTED]";
@@ -130,7 +130,7 @@ export function sanitizeUrl(rawUrl: string, maxChars: number = REDACTION_MAX_URL
     // Redact sensitive query values, preserving safe params and order.
     // Note: URLSearchParams percent-encodes "[REDACTED]" as %5BREDACTED%5D;
     // decode it back so public output contains the literal sentinel token
-    // the phase spec and tests expect (still a valid URL rendering).
+    // (still a valid URL rendering).
     const params = parsed.searchParams;
     let mutated = false;
     const names: string[] = [];

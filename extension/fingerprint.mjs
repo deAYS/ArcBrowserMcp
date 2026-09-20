@@ -1,14 +1,14 @@
 /**
- * Deterministic extension build identity (P07, extended P09).
+ * Deterministic extension build identity.
  *
- * The P06 build embedded a wall-clock timestamp, so source-identical builds
+ * Earlier builds embedded a wall-clock timestamp, so source-identical builds
  * produced different buildIds and different background.js hashes. This module
  * derives the buildId as a SHA-256 fingerprint over deterministic build
  * inputs instead: every file under extension/ (excluding the dist/ output),
  * plus the extension-consumed shared sources bundled into background.js,
  * plus the repo-level package/lock metadata that selects the bundler.
  *
- * Extension-consumed shared sources (P09): the background bundle imports
+ * Extension-consumed shared sources: the background bundle imports
  * src/browser/navigationPolicy, snapshotSemantics, interactionPolicy,
  * pageToolsPolicy, observability/*, security/Redaction, and
  * bridge/frameLimits. Changing any of them MUST change the buildId, so they

@@ -43,8 +43,7 @@ export interface BridgeRuntimeOptions {
  * Owns the MCP-side named-pipe server and session descriptor, surfaces
  * relay lifecycle events, and sends transport/health RPC. Knows nothing
  * about browser tabs, CDP, or MCP tools; ArcExtensionEngine orchestrates
- * connect/disconnect/status on top of this runtime. Reuses the proven
- * P03B transport modules instead of duplicating them.
+ * connect/disconnect/status on top of this runtime.
  */
 export class BridgeRuntime {
   private server: McpPipeServer | null = null;

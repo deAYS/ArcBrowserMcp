@@ -231,7 +231,7 @@ function relayLoop(
   log: (message: string) => void,
 ): Promise<number> {
   return new Promise<number>((resolve) => {
-    // Directional decoders (P08T). Chrome stdio stdin carries
+    // Directional decoders. Chrome stdio stdin carries
     // extension->host traffic: overwhelmingly extension-originated
     // RESPONSES (the screenshot direction, 64 MiB platform cap), so the
     // LARGE response bound applies here. The named-pipe read carries

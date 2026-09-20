@@ -1,11 +1,11 @@
 /**
- * Shared P08 capability policy (Node + extension, dependency-free).
+ * Shared capability policy (Node + extension, dependency-free).
  *
- * Owns the browser-neutral P08 boundaries so both sides enforce the same
+ * Owns the browser-neutral boundaries so both sides enforce the same
  * contract without duplicating magic values:
  * - evaluate: expression UTF-8 cap (64 KiB), timeout default/max, public
  *   result serialized cap (256 KiB), special JS value tags.
- * - screenshot: decoded PNG cap (8 MiB, mirrors the P08T transport model),
+ * - screenshot: decoded PNG cap (8 MiB, mirrors the transport model),
  *   PNG signature bytes.
  * - wait: condition value UTF-8 cap (4096), timeout default/max, poll
  *   cadence, condition taxonomy.
@@ -43,7 +43,7 @@ export const WAIT_MIN_TIMEOUT_MS = 50;
 /** Internal wait poll cadence: bounded polling, never one giant sleep. */
 export const WAIT_POLL_INTERVAL_MS = 150;
 
-/** Decoded PNG hard cap (mirrors the approved P08T capacity model). */
+/** Decoded PNG hard cap (mirrors the transport capacity model). */
 export const SCREENSHOT_DECODED_LIMIT_BYTES = SCREENSHOT_MAX_DECODED_BYTES;
 
 /** PNG file signature: 89 50 4E 47 0D 0A 1A 0A. */
