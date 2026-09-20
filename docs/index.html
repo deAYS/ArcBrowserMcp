@@ -30,6 +30,7 @@
   <button role="tab" id="tabbtn-download" aria-controls="tab-download" aria-selected="true">Download</button>
   <button role="tab" id="tabbtn-install" aria-controls="tab-install" aria-selected="false">Install Guide</button>
   <button role="tab" id="tabbtn-contribute" aria-controls="tab-contribute" aria-selected="false">Contribute</button>
+  <button role="tab" id="tabbtn-access" aria-controls="tab-access" aria-selected="false">Tool Access</button>
 </nav>
 
 <main>
@@ -118,8 +119,50 @@ pnpm build:extension</code></pre>
       <li>Generated host files (<code>%LOCALAPPDATA%\arc-mcp\</code>), session files, or <code>release/</code> zips.</li>
       <li>Secrets, tokens, or the pipe session nonce in logs and tests.</li>
     </ul>
-    <p>License: MIT — see <a href="https://github.com/deAYS/ArcBrowserMcp/blob/main/LICENSE">LICENSE</a>.
+      <p>License: MIT — see <a href="https://github.com/deAYS/ArcBrowserMcp/blob/main/LICENSE">LICENSE</a>.
       Report issues at <a href="https://github.com/deAYS/ArcBrowserMcp/issues">GitHub Issues</a>.</p>
+  </section>
+
+  <section id="tab-access" role="tabpanel" aria-labelledby="tabbtn-access" hidden>
+    <h2>Tool Access</h2>
+    <p class="meta">The repo ships with all arc-mcp tools allowed. Tighten write actions to <code>ask</code> and keep reads on <code>allow</code>. Restart the client after changing config.</p>
+    <h3>OpenCode (<code>opencode.json</code>)</h3>
+    <p>Tools are named <code>arc-mcp_&lt;tool&gt;</code>, e.g. <code>arc-mcp_browser_open_tab</code>. One wildcard covers all 20 <code>browser_*</code> tools:</p>
+    <pre><code>{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "arc-mcp_*": "allow"
+  }
+}</code></pre>
+    <p>Gate writes, keep reads open:</p>
+    <pre><code>{
+  "permission": {
+    "arc-mcp_*": "allow",
+    "arc-mcp_browser_evaluate": "ask",
+    "arc-mcp_browser_click": "ask",
+    "arc-mcp_browser_fill": "ask",
+    "arc-mcp_browser_type": "ask",
+    "arc-mcp_browser_press_key": "ask",
+    "arc-mcp_browser_navigate": "ask"
+  }
+}</code></pre>
+    <p>Block everything, then opt back in:</p>
+    <pre><code>{
+  "permission": {
+    "arc-mcp_*": "deny"
+  }
+}</code></pre>
+    <p class="meta">Read-only: status, list_tabs, snapshot, get_text, screenshot, wait_for, console, network. State-changing: open/close/select tab, navigate, back, forward, reload, click, fill, type, press_key, evaluate.</p>
+    <h3>Claude Code (<code>.mcp.json</code> + permissions)</h3>
+    <p>Server registration lives in <code>.mcp.json</code> under <code>mcpServers.arc-mcp</code> — it carries no permissions. This mirrors the shipped OpenCode default (<code>arc-mcp_*</code> allow = all 20 tools); MCP tools are named <code>mcp__arc-mcp__&lt;tool&gt;</code>:</p>
+    <pre><code>{
+  "permissions": {
+    "allow": ["mcp__arc-mcp__*"],
+    "ask": [],
+    "deny": []
+  }
+}</code></pre>
+    <p class="meta">Allow rules need the literal <code>mcp__arc-mcp__</code> server prefix; a bare <code>mcp__*</code> allow is ignored. To tighten later, move write tools (e.g. <code>mcp__arc-mcp__browser_evaluate</code>) from <code>allow</code> to <code>ask</code>.</p>
   </section>
 </main>
 
