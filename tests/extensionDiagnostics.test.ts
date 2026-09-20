@@ -182,6 +182,38 @@ function fullPassMatrix(): CapabilityMatrix {
 }
 
 describe("extension diagnostics runner", () => {
+  it("emits one progress event per check with a live matrix snapshot", async () => {
+    const mock = mockChrome();
+    const seen: string[] = [];
+    const snapshots: CapabilityMatrix[] = [];
+    const report = await runDiagnostics(mock.api, {
+      networkCollectTimeoutMs: 2_000,
+      onProgress: (check, capabilities) => {
+        seen.push(check);
+        snapshots.push(JSON.parse(JSON.stringify(capabilities)) as CapabilityMatrix);
+      },
+    });
+    expect(seen).toEqual([
+      "tabs.create",
+      "tabs.query",
+      "tabs.update",
+      "debugger.attach",
+      "Runtime",
+      "DOM",
+      "Accessibility",
+      "DOMSnapshot",
+      "Page.captureScreenshot",
+      "Page",
+      "Network",
+      "Input",
+      "Target",
+      "Storage",
+      "debugger.detach",
+      "tabs.remove",
+    ]);
+    expect(report.verdict).toBe("SUPPORTED");
+    expect(snapshots[snapshots.length - 1]).toEqual(report.capabilities);
+  });
   it("reports SUPPORTED with evidence when every capability works", async () => {
     const mock = mockChrome();
     const report = await runDiagnostics(mock.api, { networkCollectTimeoutMs: 2_000 });

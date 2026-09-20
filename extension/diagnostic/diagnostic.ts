@@ -21,6 +21,12 @@ interface RenderableReport {
   [key: string]: unknown;
 }
 
+interface ProgressView {
+  running: boolean;
+  currentCheck: string | null;
+  capabilities: Record<string, Record<string, string> | string>;
+}
+
 interface BridgeStatusView {
   connected: string;
   attempts: string;
@@ -79,21 +85,17 @@ function renderBridgeStatus(view: BridgeStatusView): void {
   container.appendChild(table);
 }
 
-function render(report: RenderableReport): void {
-  currentJson = JSON.stringify(report, null, 2);
-  el("report").textContent = currentJson;
-
-  const verdict = String(report.verdict ?? "unknown");
-  const verdictEl = el("verdict");
-  verdictEl.textContent = `Verdict: ${verdict}`;
-  verdictEl.className = verdict === "SUPPORTED" ? "verdict-supported" : verdict === "BLOCKED" ? "verdict-blocked" : "verdict-unknown";
-
+function renderMatrix(capabilities: Record<string, Record<string, string> | string>): {
+  pass: number;
+  fail: number;
+  other: number;
+} {
   let pass = 0;
   let fail = 0;
   let other = 0;
   const matrixBody = tbodyOf("matrix");
   matrixBody.textContent = "";
-  for (const [group, checks] of Object.entries(report.capabilities ?? {})) {
+  for (const [group, checks] of Object.entries(capabilities)) {
     if (typeof checks === "object" && checks !== null) {
       for (const [name, value] of Object.entries(checks)) {
         if (value === "pass") {
@@ -107,6 +109,19 @@ function render(report: RenderableReport): void {
       }
     }
   }
+  return { pass, fail, other };
+}
+
+function render(report: RenderableReport): void {
+  currentJson = JSON.stringify(report, null, 2);
+  el("report").textContent = currentJson;
+
+  const verdict = String(report.verdict ?? "unknown");
+  const verdictEl = el("verdict");
+  verdictEl.textContent = `Verdict: ${verdict}`;
+  verdictEl.className = verdict === "SUPPORTED" ? "verdict-supported" : verdict === "BLOCKED" ? "verdict-blocked" : "verdict-unknown";
+
+  const { pass, fail, other } = renderMatrix(report.capabilities ?? {});
   el("summary").textContent = `${pass} pass · ${fail} fail · ${other} other`;
 
   const envBody = tbodyOf("env");
@@ -222,15 +237,46 @@ const RUN_PHASES = [
   "Detaching and cleaning up the test tab…",
 ];
 
+async function pollProgress(): Promise<string | null> {
+  try {
+    const response = await sendMessage({ type: "ARC_MCP_GET_DIAGNOSTICS_PROGRESS" });
+    const progress = response["progress"];
+    if (!isRecord(progress) || progress["running"] !== true) {
+      return null;
+    }
+    if (isRecord(progress["capabilities"])) {
+      const { pass, fail, other } = renderMatrix(
+        progress["capabilities"] as ProgressView["capabilities"],
+      );
+      el("summary").textContent = `${pass} pass · ${fail} fail · ${other} other (live)`;
+    }
+    const current = progress["currentCheck"];
+    return typeof current === "string" ? current : null;
+  } catch {
+    return null;
+  }
+}
+
 async function run(): Promise<void> {
   const runButton = el("run");
   runButton.setAttribute("disabled", "");
   const startedAt = Date.now();
+  let liveCheck: string | null = null;
   const ticker = window.setInterval(() => {
     const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-    const phase = RUN_PHASES[Math.floor(elapsed / 4) % RUN_PHASES.length] ?? RUN_PHASES[0] ?? "";
+    const phase = liveCheck
+      ?? RUN_PHASES[Math.floor(elapsed / 4) % RUN_PHASES.length]
+      ?? RUN_PHASES[0]
+      ?? "";
     el("status").textContent = `Running… ${elapsed}s elapsed — ${phase}`;
   }, 500);
+  const progressPoll = window.setInterval(() => {
+    void pollProgress().then((check) => {
+      if (check !== null) {
+        liveCheck = check;
+      }
+    });
+  }, 750);
   const bridgePoll = window.setInterval(() => {
     void refreshBridge();
   }, 2000);
@@ -246,6 +292,7 @@ async function run(): Promise<void> {
     el("status").textContent = `Run failed: ${error instanceof Error ? error.message : String(error)}`;
   } finally {
     window.clearInterval(ticker);
+    window.clearInterval(progressPoll);
     window.clearInterval(bridgePoll);
     runButton.removeAttribute("disabled");
     void refreshBridge();

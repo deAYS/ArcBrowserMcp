@@ -41,6 +41,14 @@ export interface CapabilityMatrix {
 
 export type FeasibilityVerdict = "SUPPORTED" | "BLOCKED";
 
+/** Live snapshot of an in-flight diagnostics run (polled by the UI). */
+export interface DiagnosticProgress {
+  readonly running: boolean;
+  readonly currentCheck: string | null;
+  readonly capabilities: CapabilityMatrix;
+  readonly startedAt: string;
+}
+
 export interface DiagnosticReport {
   readonly arcVersion: string;
   readonly chromiumVersion: string;

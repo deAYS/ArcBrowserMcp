@@ -1,4 +1,4 @@
-import type { ChromeApi, TabUpdatedListener, TestTab } from "./types.js";
+import type { CapabilityMatrix, ChromeApi, DiagnosticProgress, TabUpdatedListener, TestTab } from "./types.js";
 import { runDiagnostics } from "./diagnostics.js";
 import { ExtensionBridge } from "./bridge.js";
 import { TabError, TabRegistry, createMemoryTombstoneStore, createSessionTombstoneStore } from "./tabs.js";
@@ -21,6 +21,19 @@ import type { TabsChrome } from "./tabs.js";
  */
 
 const REPORT_STORAGE_KEY = "arcMcpReport";
+
+/**
+ * Latest live snapshot of the in-flight diagnostics run (null before the
+ * first run). Polled by the diagnostic page; the persisted final report
+ * stays authoritative.
+ */
+let diagnosticsProgress: DiagnosticProgress | null = null;
+
+function settleDiagnosticsProgress(): void {
+  if (diagnosticsProgress !== null) {
+    diagnosticsProgress = { ...diagnosticsProgress, running: false, currentCheck: null };
+  }
+}
 
 function parseVersions(userAgent: string): { arc: string; chromium: string } {
   const arc = userAgent.match(/Arc\/([0-9.]+)/);
@@ -684,14 +697,34 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
   if (message["type"] === "ARC_MCP_RUN_DIAGNOSTICS") {
-    runDiagnostics(api)
+    const startedAt = new Date().toISOString();
+    runDiagnostics(api, {
+      onProgress: (currentCheck, capabilities) => {
+        try {
+          diagnosticsProgress = {
+            running: true,
+            currentCheck,
+            capabilities: JSON.parse(JSON.stringify(capabilities)) as CapabilityMatrix,
+            startedAt,
+          };
+        } catch {
+          // Best-effort snapshot; the final report is authoritative.
+        }
+      },
+    })
       .then((report) => {
+        settleDiagnosticsProgress();
         void chrome.storage.local.set({ [REPORT_STORAGE_KEY]: report }).then(() => sendResponse({ ok: true, report }));
       })
       .catch((error: unknown) => {
+        settleDiagnosticsProgress();
         sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) });
       });
     return true;
+  }
+  if (message["type"] === "ARC_MCP_GET_DIAGNOSTICS_PROGRESS") {
+    sendResponse({ ok: true, progress: diagnosticsProgress });
+    return false;
   }
   if (message["type"] === "ARC_MCP_GET_BRIDGE_STATUS") {
     // Any UI interaction wakes the worker: use it as a connect trigger too.

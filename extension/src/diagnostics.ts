@@ -103,6 +103,8 @@ export interface RunOptions {
   readonly networkCollectTimeoutMs?: number;
   /** Bound for test-tab readiness (default 15s; tests use less). */
   readonly tabReadyTimeoutMs?: number;
+  /** Called after every check settles with a live matrix snapshot. */
+  readonly onProgress?: (currentCheck: string, capabilities: CapabilityMatrix) => void;
 }
 
 function isExpectedUrl(actual: string | undefined, expected: string): boolean {
@@ -184,8 +186,17 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
   const evidence: Record<string, string | number | boolean> = { testUrl };
   const notes: string[] = [];
 
+  const emit = (check: string): void => {
+    try {
+      options.onProgress?.(check, capabilities);
+    } catch {
+      // Progress reporting is best-effort; it must never fail the run.
+    }
+  };
+
   const fail = (key: string, error: unknown): void => {
     errors[key] = messageOf(error);
+    emit(key);
   };
 
   let tabId: number | null = null;
@@ -223,6 +234,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       fail("tabs.create", error);
       return;
     }
+    emit("tabs.create");
 
     // ---- tabs.get/query ----
     try {
@@ -237,6 +249,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       capabilities.tabs.query = "fail";
       fail("tabs.query", error);
     }
+    emit("tabs.query");
 
     // ---- tabs.update (benign activation of our own tab) ----
     try {
@@ -246,6 +259,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       capabilities.tabs.update = "fail";
       fail("tabs.update", error);
     }
+    emit("tabs.update");
 
     // ---- readiness: committed expected URL + complete load, bounded ----
     try {
@@ -276,6 +290,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       notes.push("Debugger attach failed; all CDP domain tests skipped (verdict BLOCKED).");
       return;
     }
+    emit("debugger.attach");
 
     // ---- Runtime ----
     try {
@@ -295,6 +310,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       capabilities.cdp.Runtime = "fail";
       fail("Runtime", error);
     }
+    emit("Runtime");
 
     // ---- DOM ----
     try {
@@ -311,6 +327,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       capabilities.cdp.DOM = "fail";
       fail("DOM", error);
     }
+    emit("DOM");
 
     // ---- Accessibility (semantic snapshot foundation) ----
     try {
@@ -337,6 +354,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       capabilities.cdp.Accessibility = "fail";
       fail("Accessibility", error);
     }
+    emit("Accessibility");
 
     // ---- DOMSnapshot ----
     try {
@@ -353,6 +371,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       capabilities.cdp.DOMSnapshot = "fail";
       fail("DOMSnapshot", error);
     }
+    emit("DOMSnapshot");
 
     // ---- Page (+ screenshot payload proof) ----
     try {
@@ -378,10 +397,12 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
         capabilities.cdp.Page_captureScreenshot = "fail";
         fail("Page.captureScreenshot", error);
       }
+      emit("Page.captureScreenshot");
     } catch (error: unknown) {
       capabilities.cdp.Page = "fail";
       fail("Page", error);
     }
+    emit("Page");
 
     // ---- Network (events generated only by our own tab reload) ----
     try {
@@ -420,6 +441,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       capabilities.cdp.Network = "fail";
       fail("Network", error);
     }
+    emit("Network");
 
     // ---- Input (non-destructive mouse move in our own tab) ----
     try {
@@ -429,6 +451,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       capabilities.cdp.Input = "fail";
       fail("Input", error);
     }
+    emit("Input");
 
     // ---- Target (chrome.debugger.getTargets API only; never a CDP command) ----
     try {
@@ -444,6 +467,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       capabilities.cdp.Target = "fail";
       fail("Target", error);
     }
+    emit("Target");
 
     // ---- Storage (quota/usage metadata only; never content) ----
     try {
@@ -459,6 +483,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
       capabilities.cdp.Storage = "fail";
       fail("Storage", error);
     }
+    emit("Storage");
   }
 
   try {
@@ -476,6 +501,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
         capabilities.debugger.detach = "fail";
         fail("debugger.detach", error);
       }
+      emit("debugger.detach");
     }
     if (tabId !== null) {
       try {
@@ -485,6 +511,7 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
         capabilities.tabs.remove = "fail";
         fail("tabs.remove", error);
       }
+      emit("tabs.remove");
     }
   }
 
