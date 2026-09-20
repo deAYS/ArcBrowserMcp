@@ -35,6 +35,10 @@ export interface BridgeRuntimeOptions {
   readonly pipeName?: string;
   readonly sessionDir?: string;
   readonly logger?: Logger;
+  /** Parent-death watchdog: forwarded to McpPipeServer (see its options). */
+  readonly orphanCheckIntervalMs?: number;
+  readonly isParentAlive?: (pid: number) => boolean;
+  readonly onOrphaned?: () => void;
 }
 
 /**
@@ -74,12 +78,21 @@ export class BridgeRuntime {
   }
 
   async start(): Promise<void> {
-    const options: { pipeName: string; sessionDir: string; logger?: Logger } = {
+    const options: { pipeName: string; sessionDir: string; logger?: Logger; orphanCheckIntervalMs?: number; isParentAlive?: (pid: number) => boolean; onOrphaned?: () => void } = {
       pipeName: this.pipeName(),
       sessionDir: this.sessionDir(),
     };
     if (this.options.logger !== undefined) {
       options.logger = this.options.logger;
+    }
+    if (this.options.orphanCheckIntervalMs !== undefined) {
+      options.orphanCheckIntervalMs = this.options.orphanCheckIntervalMs;
+    }
+    if (this.options.isParentAlive !== undefined) {
+      options.isParentAlive = this.options.isParentAlive;
+    }
+    if (this.options.onOrphaned !== undefined) {
+      options.onOrphaned = this.options.onOrphaned;
     }
     const server = new McpPipeServer(options);
     server.onRelayState((state: RelayState) => {

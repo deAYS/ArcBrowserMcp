@@ -24,7 +24,16 @@ async function main(): Promise<void> {
     extensionId: identity.extensionId,
     origin: extensionOrigin(identity.extensionId),
   });
-  const runtime = new BridgeRuntime({ logger });
+  // Assigned once the stdio server exists; the orphan watchdog above can
+  // only fire after engine.connect(), so the no-op default is never used.
+  let shutdown: (signal: string) => void = () => undefined;
+  const runtime = new BridgeRuntime({
+    logger,
+    // Reap orphans: if opencode dies without reaping its MCP child, the
+    // child would otherwise hold the pipe forever (PIPE_BUSY for every
+    // later session). Assigned below; no-op until startup completes.
+    onOrphaned: () => shutdown("PARENT_LOST"),
+  });
   const engine = new ArcExtensionEngine({
     runtime,
     extensionId: identity.extensionId,
@@ -55,7 +64,7 @@ async function main(): Promise<void> {
     extensionId: status.extensionId,
   });
 
-  const shutdown = createShutdownHandler(handle, logger, () => engine.disconnect());
+  shutdown = createShutdownHandler(handle, logger, () => engine.disconnect());
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }

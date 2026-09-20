@@ -1,11 +1,12 @@
 import * as net from "node:net";
+import { readFile } from "node:fs/promises";
 import { BridgeError } from "./BridgeError.js";
 import { safeEqualString } from "./nativeHostArgs.js";
 import { encodeNativeMessage, NativeFrameDecoder } from "./nativeFraming.js";
 import { BRIDGE_PROTOCOL_VERSION } from "./protocol.js";
 import type { BridgeMessage, BridgeRequest } from "./protocol.js";
 import { RpcPeer } from "./rpc.js";
-import { BRIDGE_SESSION_FILE_NAME, createSession, removeSessionFile, writeSessionAtomic } from "./session.js";
+import { BRIDGE_SESSION_FILE_NAME, createSession, defaultIsPidAlive, isSessionStale, loadSessionDescriptor, removeSessionFile, writeSessionAtomic } from "./session.js";
 import type { BridgeSession } from "./session.js";
 import { applyBridgePipeAcl } from "./pipeAcl.js";
 import type { Logger } from "../utils/logger.js";
@@ -24,6 +25,16 @@ export interface McpPipeServerOptions {
    * Everyone ACE (nonce auth still required after connect).
    */
   readonly applyPipeAcl?: (pipeName: string) => Promise<void>;
+  /**
+   * Parent-death watchdog: when opencode is killed without reaping its MCP
+   * child, the orphan would otherwise hold the pipe forever and every later
+   * session fails PIPE_BUSY. Armed only when onOrphaned is set; production
+   * wires it to process shutdown. Never removes another owner's session.
+   */
+  readonly parentPid?: number;
+  readonly orphanCheckIntervalMs?: number;
+  readonly isParentAlive?: (pid: number) => boolean;
+  readonly onOrphaned?: () => void;
 }
 
 interface RelaySocket {
@@ -33,6 +44,7 @@ interface RelaySocket {
 }
 
 const DEFAULT_HELLO_TIMEOUT_MS = 15_000;
+const DEFAULT_ORPHAN_CHECK_INTERVAL_MS = 5_000;
 
 /**
  * Named-pipe endpoint owned by the active MCP process.
@@ -50,6 +62,7 @@ export class McpPipeServer {
   private session: BridgeSession | null = null;
   private ownSession = false;
   private listenStartedAt = 0;
+  private orphanTimer: ReturnType<typeof setInterval> | null = null;
   private readonly stateListeners: Array<(state: RelayState) => void> = [];
 
   constructor(private readonly options: McpPipeServerOptions) {}
@@ -83,21 +96,22 @@ export class McpPipeServer {
     this.sessionPath = sessionPath;
     const server = net.createServer((socket) => this.attachSocket(socket));
     this.server = server;
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", (error: unknown) => {
-        const code = (error as { code?: unknown }).code;
-        if (code === "EADDRINUSE") {
-          reject(
-            new BridgeError("PIPE_BUSY", `named pipe ${pipeName} is already owned by another MCP process`, {
-              pipeName,
-            }),
-          );
-          return;
-        }
-        reject(error);
-      });
-      server.listen(pipeName, () => resolve());
-    });
+    try {
+      await this.listenOnPipe(server, pipeName);
+    } catch (error: unknown) {
+      if ((error as { code?: unknown }).code !== "EADDRINUSE" || !(await this.clearStaleSessionFile(sessionPath))) {
+        this.server = null;
+        throw this.asPipeBusy(pipeName, error);
+      }
+      // Conflicting session was absent/corrupt/stale (crash or
+      // stop-in-progress race): retry once, then fail as busy.
+      try {
+        await this.listenOnPipe(server, pipeName);
+      } catch (retryError: unknown) {
+        this.server = null;
+        throw this.asPipeBusy(pipeName, retryError);
+      }
+    }
     const session = createSession(pipeName, process.pid);
     this.session = session;
     try {
@@ -113,8 +127,86 @@ export class McpPipeServer {
     await writeSessionAtomic(sessionPath, session);
     this.ownSession = true;
     this.listenStartedAt = Date.now();
+    this.armOrphanWatchdog();
     this.log("info", "bridge pipe listening", { pipeName });
     return { pipeName, pid: process.pid };
+  }
+
+  private listenOnPipe(server: net.Server, pipeName: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      server.once("error", (error: unknown) => {
+        reject(error);
+      });
+      server.listen(pipeName, () => resolve());
+    });
+  }
+
+  private asPipeBusy(pipeName: string, error: unknown): unknown {
+    if ((error as { code?: unknown }).code === "EADDRINUSE") {
+      return new BridgeError(
+        "PIPE_BUSY",
+        `named pipe ${pipeName} is already owned by another MCP process (is a previous opencode session still running?)`,
+        { pipeName },
+      );
+    }
+    return error;
+  }
+
+  /**
+   * True when the conflicting owner's session is absent, corrupt, or stale
+   * (owner PID dead) — safe to drop and retry the listen once. A live
+   * owner's session is never touched.
+   */
+  private async clearStaleSessionFile(sessionPath: string): Promise<boolean> {
+    let session: BridgeSession | null = null;
+    try {
+      session = await loadSessionDescriptor((path) => readFile(path, "utf-8"), sessionPath);
+    } catch {
+      // Corrupt/unreadable descriptor belongs to nobody real (session writes
+      // are atomic): drop it and retry once.
+    }
+    if (session !== null && !isSessionStale(session, defaultIsPidAlive)) {
+      return false;
+    }
+    try {
+      await removeSessionFile(sessionPath);
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
+  private armOrphanWatchdog(): void {
+    const onOrphaned = this.options.onOrphaned;
+    if (onOrphaned === undefined) {
+      return;
+    }
+    const parentPid = this.options.parentPid ?? process.ppid ?? 0;
+    if (parentPid <= 0) {
+      return;
+    }
+    const intervalMs = this.options.orphanCheckIntervalMs ?? DEFAULT_ORPHAN_CHECK_INTERVAL_MS;
+    const isAlive = this.options.isParentAlive ?? defaultIsPidAlive;
+    this.orphanTimer = setInterval(() => {
+      let alive = false;
+      try {
+        alive = isAlive(parentPid);
+      } catch {
+        alive = false;
+      }
+      if (!alive) {
+        this.disarmOrphanWatchdog();
+        onOrphaned();
+      }
+    }, intervalMs);
+    this.orphanTimer.unref?.();
+  }
+
+  private disarmOrphanWatchdog(): void {
+    if (this.orphanTimer !== null) {
+      clearInterval(this.orphanTimer);
+      this.orphanTimer = null;
+    }
   }
 
   private attachSocket(socket: net.Socket): void {
@@ -232,6 +324,7 @@ export class McpPipeServer {
   }
 
   async stop(): Promise<void> {
+    this.disarmOrphanWatchdog();
     this.setState("closed");
     const relay = this.relay;
     this.relay = null;

@@ -1,8 +1,8 @@
 import * as net from "node:net";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { BridgeError } from "../src/bridge/BridgeError.js";
 import { McpPipeServer } from "../src/bridge/mcpPipeServer.js";
 import { encodeNativeMessage, NativeFrameDecoder } from "../src/bridge/nativeFraming.js";
@@ -155,6 +155,75 @@ describe("MCP pipe authentication", () => {
       expect(caught).toBeInstanceOf(BridgeError);
       expect((caught as BridgeError).code).toBe("PIPE_BUSY");
       await first.stop();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("stays PIPE_BUSY when the pipe is held even with a stale session file", async () => {
+    const { dir, cleanup } = await tempSessionDir();
+    try {
+      const pipeName = freshPipeName();
+      const first = new McpPipeServer({ pipeName, sessionDir: dir, applyPipeAcl: () => Promise.resolve() });
+      await first.start();
+      // Simulate a trashed descriptor: retry must not steal a live pipe.
+      await writeFile(
+        path.join(dir, "bridge-session.json"),
+        JSON.stringify({ version: 1, pipeName, nonceHex: "a".repeat(64), mcpPid: 2_147_483_647, createdAt: new Date().toISOString() }),
+        "utf-8",
+      );
+      const second = new McpPipeServer({ pipeName, sessionDir: dir, applyPipeAcl: () => Promise.resolve() });
+      await expect(second.start()).rejects.toMatchObject({ code: "PIPE_BUSY" });
+      await first.stop();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("fires onOrphaned when the parent pid is dead", async () => {
+    const { dir, cleanup } = await tempSessionDir();
+    try {
+      let orphaned = 0;
+      const server = new McpPipeServer({
+        pipeName: freshPipeName(),
+        sessionDir: dir,
+        applyPipeAcl: () => Promise.resolve(),
+        parentPid: 2_147_483_647,
+        orphanCheckIntervalMs: 10,
+        isParentAlive: () => false,
+        onOrphaned: () => {
+          orphaned += 1;
+        },
+      });
+      await server.start();
+      await vi.waitFor(() => {
+        expect(orphaned).toBe(1);
+      });
+      await server.stop();
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it("stays silent while the parent pid is alive", async () => {
+    const { dir, cleanup } = await tempSessionDir();
+    try {
+      let orphaned = 0;
+      const server = new McpPipeServer({
+        pipeName: freshPipeName(),
+        sessionDir: dir,
+        applyPipeAcl: () => Promise.resolve(),
+        parentPid: process.pid,
+        orphanCheckIntervalMs: 10,
+        isParentAlive: () => true,
+        onOrphaned: () => {
+          orphaned += 1;
+        },
+      });
+      await server.start();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(orphaned).toBe(0);
+      await server.stop();
     } finally {
       await cleanup();
     }
