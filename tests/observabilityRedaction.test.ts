@@ -9,21 +9,21 @@ import {
 } from "../src/security/Redaction.js";
 
 /**
- * P09 redaction unit tests (mocked, deterministic, no browser).
+ * Redaction unit tests (mocked, deterministic, no browser).
  *
  * Sentinel values stand in for credentials; tests never print raw sentinels
  * on success (assertions check absence from serialized results). Mixed-case
  * header names are mandatory coverage.
  */
 
-const BEARER_SENTINEL = "p09-bearer-sentinel-9f2c41";
+const BEARER_SENTINEL = "bearer-sentinel-9f2c41";
 const BASIC_SENTINEL = "cG09YmFzaWMtc2VudGluZWw=";
-const TOKEN_SENTINEL = "p09-token-sentinel-77aa10";
-const COOKIE_SENTINEL = "p09-cookie-sentinel-31bd88";
-const URL_SECRET = "p09-url-secret-5e07c2";
-const BODY_SENTINEL = "p09-body-sentinel-9d41ab-must-never-appear";
+const TOKEN_SENTINEL = "token-sentinel-77aa10";
+const COOKIE_SENTINEL = "cookie-sentinel-31bd88";
+const URL_SECRET = "url-secret-5e07c2";
+const BODY_SENTINEL = "body-sentinel-9d41ab-must-never-appear";
 
-describe("P09 header redaction", () => {
+describe("header redaction", () => {
   it("redacts Authorization in any casing without preserving prefixes", () => {
     for (const name of ["Authorization", "authorization", "aUtHoRiZaTiOn"]) {
       const out = redactHeaders({ [name]: `Bearer ${BEARER_SENTINEL}` });
@@ -66,7 +66,7 @@ describe("P09 header redaction", () => {
   });
 });
 
-describe("P09 URL redaction", () => {
+describe("URL redaction", () => {
   it("redacts sensitive query values and preserves safe params", () => {
     const sanitized = sanitizeUrl(`https://example.test/api?access_token=${URL_SECRET}&page=2`);
     expect(sanitized).toContain("access_token=[REDACTED]");
@@ -106,7 +106,7 @@ describe("P09 URL redaction", () => {
   });
 });
 
-describe("P09 console text redaction", () => {
+describe("console text redaction", () => {
   it("redacts Bearer and Basic credentials (any scheme casing)", () => {
     expect(redactConsoleText(`calling with Bearer ${BEARER_SENTINEL} now`)).toBe(
       "calling with Bearer [REDACTED] now",

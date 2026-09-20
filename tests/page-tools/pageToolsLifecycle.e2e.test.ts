@@ -14,7 +14,7 @@ import { loadExtensionIdentity } from "../../src/bridge/extensionIdentity.js";
 import { createServer } from "../../src/server/server.js";
 
 /**
- * Real P08 page tools over MCP (opt-in via pnpm test:page-tools; never
+ * Real page tools over MCP (opt-in via pnpm test:page-tools; never
  * runs under plain pnpm test). Deterministic disposable fixture served ONLY
  * from 127.0.0.1 on an ephemeral port (test infrastructure only; not a
  * product listener). Pre-existing user tabs are recorded first and must
@@ -22,8 +22,7 @@ import { createServer } from "../../src/server/server.js";
  * tab is restored. Existing user pages are never evaluated,
  * screenshotted, inspected, or waited against.
  *
- * DO NOT RUN against a stale (pre-P08) extension worker: the prelive gate
- * requires the live buildId to match the reviewer-approved P08 build
+ * DO NOT RUN against a stale extension worker: rebuild the extension
  * before this suite runs.
  */
 
@@ -64,22 +63,22 @@ interface SnapshotPayload {
 }
 
 const FIXTURE_HTML = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>P08 Fixture Home</title></head>
+<html lang="en"><head><meta charset="utf-8"><title>Fixture Home</title></head>
 <body>
-<h1>P08 Fixture</h1>
+<h1>Fixture</h1>
 <div id="status" role="status">status: ready</div>
 <div id="delayed" role="status">waiting</div>
 <div id="content"><p>Normal visible content for screenshot verification: the quick brown fox jumps over the lazy dog 0123456789.</p><p>Second paragraph with enough text to render a non-trivial viewport capture.</p></div>
 <script>
-setTimeout(() => { document.getElementById("delayed").textContent = "delayed-token-p08-visible"; }, 1500);
-setTimeout(() => { document.title = "P08 Fixture Delayed"; }, 2500);
+setTimeout(() => { document.getElementById("delayed").textContent = "delayed-token-visible"; }, 1500);
+setTimeout(() => { document.title = "Fixture Delayed"; }, 2500);
 </script>
 </body></html>`;
 
 const NEXT_HTML = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>P08 Fixture Next</title></head>
+<html lang="en"><head><meta charset="utf-8"><title>Fixture Next</title></head>
 <body>
-<h1>P08 Fixture Next</h1>
+<h1>Fixture Next</h1>
 <div id="status" role="status">status: next</div>
 </body></html>`;
 
@@ -248,7 +247,7 @@ afterAll(async () => {
   }
 }, 120_000);
 
-describe("real P08 page tools over MCP", () => {
+describe("real page tools over MCP", () => {
   it(
     "evaluate/screenshot/wait_for against a disposable localhost fixture",
     async () => {
@@ -262,7 +261,7 @@ describe("real P08 page tools over MCP", () => {
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
       handle = serveStdio(() => createServer(service), { transport: serverTransport });
       const testClient = new Client(
-        { name: "arc-mcp-p08-test-client", version: "0.0.0" },
+        { name: "arc-mcp-page-tools-test-client", version: "0.0.0" },
         { versionNegotiation: { mode: { pin: "2026-07-28" } } },
       );
       client = testClient;
@@ -327,9 +326,9 @@ describe("real P08 page tools over MCP", () => {
       );
       expect(promised).toEqual({ kind: "json", value: 42 });
 
-      const throwing = await callTool("browser_evaluate", { expression: "throw new Error('p08-fixture-boom')" });
+      const throwing = await callTool("browser_evaluate", { expression: "throw new Error('fixture-boom')" });
       expect(toolErrorCode(throwing)).toBe("BROWSER_EVALUATION_FAILED");
-      expect(JSON.stringify(throwing.content)).not.toContain("p08-fixture-boom");
+      expect(JSON.stringify(throwing.content)).not.toContain("fixture-boom");
 
       // Dispatched evaluation invalidates refs (even the throwing one did).
       const staleProbe = await callTool("browser_get_text", { ref: preEvalRef });
@@ -376,7 +375,7 @@ describe("real P08 page tools over MCP", () => {
       // Same ref still works: screenshot did not rotate/invalidate refs.
       const afterShot = await callTool("browser_get_text", { ref: shotRef });
       expect(afterShot.isError).not.toBe(true);
-      expect(JSON.stringify(afterShot.structuredContent)).toContain("P08 Fixture");
+      expect(JSON.stringify(afterShot.structuredContent)).toContain("Fixture");
 
       // ---- WAIT-REF PRESERVATION (stable document, no navigation):
       // snapshot, retain heading ref, successful load/text/title waits must
@@ -390,14 +389,14 @@ describe("real P08 page tools over MCP", () => {
       expect(stableLoadWait.isError).not.toBe(true);
       expect(stableLoadWait.structuredContent).toMatchObject({ matched: true, condition: "load" });
       const stableTextWait = await callTool("browser_wait_for", {
-        condition: { type: "text", value: "P08 Fixture" },
+        condition: { type: "text", value: "Fixture" },
         timeoutMs: 15_000,
       });
       expect(stableTextWait.isError).not.toBe(true);
       expect(stableTextWait.structuredContent).toMatchObject({ matched: true, condition: "text" });
       const waitPreserved = await callTool("browser_get_text", { ref: waitPreservedRef });
       expect(waitPreserved.isError, "wait must preserve live refs on a stable document").not.toBe(true);
-      expect(JSON.stringify(waitPreserved.structuredContent)).toContain("P08 Fixture");
+      expect(JSON.stringify(waitPreserved.structuredContent)).toContain("Fixture");
 
       // ---- WAIT: load, text (delayed), title (delayed), url (same-tab nav), timeout.
       const loadWait = await callTool("browser_wait_for", {
@@ -408,14 +407,14 @@ describe("real P08 page tools over MCP", () => {
       expect(loadWait.structuredContent).toMatchObject({ matched: true, condition: "load" });
 
       const textWait = await callTool("browser_wait_for", {
-        condition: { type: "text", value: "delayed-token-p08-visible" },
+        condition: { type: "text", value: "delayed-token-visible" },
         timeoutMs: 30_000,
       });
       expect(textWait.isError).not.toBe(true);
       expect(textWait.structuredContent).toMatchObject({ matched: true, condition: "text" });
 
       const titleWait = await callTool("browser_wait_for", {
-        condition: { type: "title", match: "equals", value: "P08 Fixture Delayed" },
+        condition: { type: "title", match: "equals", value: "Fixture Delayed" },
         timeoutMs: 30_000,
       });
       expect(titleWait.isError).not.toBe(true);
@@ -432,13 +431,13 @@ describe("real P08 page tools over MCP", () => {
       expect((await engine.status()).selectedTabId).toBe(openedTab.id);
 
       const impossible = await callTool("browser_wait_for", {
-        condition: { type: "text", value: "p08-impossible-token-zzz-999" },
+        condition: { type: "text", value: "impossible-token-zzz-999" },
         timeoutMs: WAIT_SHORT_MS,
       });
       expect(toolErrorCode(impossible)).toBe("BROWSER_WAIT_TIMEOUT");
 
       // ---- Privileged negatives on a DETERMINISTIC disposable new-tab page
-      // owned by the test (P04/P05/P06 precedent: no-URL open yields a
+      // owned by the test (no-URL open yields a
       // privileged chrome://newtab/ source). No pre-existing user tab is
       // touched; the privileged page contents are never inspected.
       const privilegedOpen = await callTool("browser_open_tab", {});
@@ -473,7 +472,7 @@ describe("real P08 page tools over MCP", () => {
       // BROWSER_TAB_NOT_CONTROLLABLE below is the real required signal.
       // eslint-disable-next-line no-console
       console.log(
-        `[p08-ac4] privileged seen url=${JSON.stringify(privilegedSeen?.url ?? null)} controllable=${String(privilegedSeen?.controllable ?? null)}`,
+        `[nav-privileged] privileged seen url=${JSON.stringify(privilegedSeen?.url ?? null)} controllable=${String(privilegedSeen?.controllable ?? null)}`,
       );
       if (privilegedSeen?.url !== undefined && /^https?:/i.test(privilegedSeen.url)) {
         throw new Error(`disposable privileged tab unexpectedly controllable: ${JSON.stringify(privilegedSeen.url)}`);

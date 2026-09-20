@@ -11,7 +11,7 @@ import {
 } from "./liveHelpers.js";
 
 /**
- * P10 controlled reconnect live test (opt-in via pnpm test:reconnect; never
+ * Controlled reconnect live test (opt-in via pnpm test:reconnect; never
  * runs under plain pnpm test). Disrupts ONLY BrowserMcp's own bridge: stops
  * the Node pipe server (the native host exits cleanly on pipe close), proves
  * status detects the loss, restarts the bridge, and proves the extension
@@ -29,16 +29,16 @@ afterAll(async () => {
   }
 }, 120_000);
 
-describe("P10 controlled bridge reconnect (live)", () => {
+describe("controlled bridge reconnect (live)", () => {
   it(
     "recovers the authoritative session after a controlled pipe restart",
     async () => {
       const { base, server } = await startFixture((req, res) => {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        res.end(`<!doctype html><html><head><title>P10 Reconnect</title></head><body><h1>reconnect</h1></body></html>`);
+        res.end(`<!doctype html><html><head><title>Reconnect</title></head><body><h1>reconnect</h1></body></html>`);
         void req;
       });
-      ctx = await startLiveSession("arc-mcp-p10-reconnect-client");
+      ctx = await startLiveSession("arc-mcp-reconnect-test-client");
       ctx.fixtureServer = server;
       const opened = await openDisposableTab(ctx, `${base}/`);
       expect(opened.controllable).toBe(true);

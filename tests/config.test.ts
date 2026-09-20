@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { ConfigError, defaultConfig, loadConfig } from "../src/config/index.js";
 
 describe("defaultConfig", () => {
-  it("provides safe P00 defaults", () => {
+  it("provides safe defaults", () => {
     const config = defaultConfig();
     expect(config.debugPort).toBe(9222);
-    // Reviewer-directed P02 correction: no CWD-relative profile default.
+    // No CWD-relative profile default.
     // An absent ARC_MCP_PROFILE_PATH leaves profilePath undefined so
     // ArcProfile resolves the stable per-user default (LOCALAPPDATA-based).
     expect(config.profilePath).toBeUndefined();

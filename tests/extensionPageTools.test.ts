@@ -30,7 +30,7 @@ function tree(): AxNode[] {
     {
       nodeId: "1",
       role: { value: "heading" },
-      name: { value: "P08 Fixture" },
+      name: { value: "Fixture" },
       backendDOMNodeId: 301,
       childIds: ["2", "3"],
     },
@@ -64,7 +64,7 @@ interface Harness {
   screenshotData: (data: unknown) => void;
 }
 
-/** Minimal fake: only the P08 paths + capture support are served. */
+/** Minimal fake: only the page-tool paths + capture support are served. */
 function harness(options: {
   runtimeImpl?: (expression: string) => Record<string, unknown>;
   tabUrl?: string;
@@ -196,7 +196,7 @@ function tinyPngBytes(): number[] {
   return [...raw.slice(0, 8)];
 }
 
-describe("P08 evaluate result projection", () => {
+describe("evaluate result projection", () => {
   it("projects JSON primitives, arrays, and plain objects by value", () => {
     expect(toProjectEvaluateValue({ result: { type: "string", value: "hi" } })).toEqual({ kind: "json", value: "hi" });
     expect(toProjectEvaluateValue({ result: { type: "number", value: 42 } })).toEqual({ kind: "json", value: 42 });
@@ -231,7 +231,7 @@ describe("P08 evaluate result projection", () => {
   });
 
   it("rejects exceptions, objectIds, and non-serializable shapes without echoing page data", () => {
-    const secret = `p08-eval-secret-${"d4".repeat(8)}`;
+    const secret = `eval-secret-${"d4".repeat(8)}`;
     for (const raw of [
       { exceptionDetails: { text: "boom", exception: { description: secret } } },
       { result: { type: "object", objectId: "1:2:3", description: secret } },
@@ -263,7 +263,7 @@ describe("P08 evaluate result projection", () => {
   });
 });
 
-describe("P08 evaluate dispatch semantics", () => {
+describe("evaluate dispatch semantics", () => {
   it("uses the fixed Runtime.evaluate params (awaitPromise/returnByValue/no gesture/no CLI API/native timeout)", async () => {
     const fixture = harness();
     const result = await fixture.manager.evaluateElement(PROJECT, "1+1", 5_000);
@@ -346,7 +346,7 @@ describe("P08 evaluate dispatch semantics", () => {
   });
 
   it("thrown sentinel secrets never appear in errors or commands", async () => {
-    const sentinel = `p08-eval-secret-${"e5".repeat(8)}`;
+    const sentinel = `eval-secret-${"e5".repeat(8)}`;
     const fixture = harness({
       runtimeImpl: () => ({ exceptionDetails: { text: "boom", exception: { description: sentinel } } }),
     });
@@ -362,7 +362,7 @@ describe("P08 evaluate dispatch semantics", () => {
   });
 });
 
-describe("P08 screenshot dispatch semantics", () => {
+describe("screenshot dispatch semantics", () => {
   it("uses fixed viewport-PNG params and validates the PNG fixture", async () => {
     const fixture = harness();
     const shot = await fixture.manager.captureScreenshot(PROJECT);
@@ -452,7 +452,7 @@ describe("P08 screenshot dispatch semantics", () => {
   });
 });
 
-describe("P08 operation-scoped CDP capabilities", () => {
+describe("operation-scoped CDP capabilities", () => {
   it("declares the exact effective capability groups", () => {
     expect([...CDP_CAPABILITY_METHODS.snapshot]).toEqual([
       "Accessibility.enable",
@@ -535,7 +535,7 @@ describe("P08 operation-scoped CDP capabilities", () => {
   });
 });
 
-describe("P08 evaluate timeout retirement", () => {
+describe("evaluate timeout retirement", () => {
   it("owned evaluate success performs no detach and stays reusable", async () => {
     const fixture = harness();
     await fixture.manager.evaluateElement(PROJECT, "1", 5_000);

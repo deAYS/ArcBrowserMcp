@@ -31,7 +31,7 @@ function consoleEntry(text: string, level: "log" | "info" | "warning" | "error" 
   return { timestamp: TS, level, text };
 }
 
-describe("P09 console monitor: ring buffer semantics", () => {
+describe("console monitor: ring buffer semantics", () => {
   it("holds exactly capacity entries, then evicts oldest with dropped count", () => {
     const monitor = new ConsoleMonitor(3);
     monitor.ingest(consoleEntry("a"));
@@ -86,7 +86,7 @@ describe("P09 console monitor: ring buffer semantics", () => {
   });
 });
 
-describe("P09 console event normalization", () => {
+describe("console event normalization", () => {
   it("renders primitives for log/info/warning/error/debug with timestamp+source", () => {
     for (const type of ["log", "info", "warning", "error", "debug"] as const) {
       const entry = normalizeConsoleAPICalled(
@@ -126,19 +126,19 @@ describe("P09 console event normalization", () => {
     const entry = normalizeConsoleAPICalled(
       {
         type: "log",
-        args: [{ type: "string", value: `Bearer p09-console-secret-${"ab".repeat(8)} tail` }],
-        url: `https://example.test/app.js?access_token=p09-console-secret-${"ab".repeat(8)}`,
+    args: [{ type: "string", value: `Bearer test-console-secret-${"ab".repeat(8)} tail` }],
+    url: `https://example.test/app.js?access_token=test-console-secret-${"ab".repeat(8)}`,
       },
       TS,
     );
-    expect(entry.text).not.toContain("p09-console-secret-");
+    expect(entry.text).not.toContain("test-console-secret-");
     expect(entry.text.length).toBeLessThanOrEqual(4000);
-    expect(entry.source?.url).not.toContain("p09-console-secret-");
+    expect(entry.source?.url).not.toContain("test-console-secret-");
     expect(entry.source?.url).toContain("access_token=[REDACTED]");
   });
 
   it("normalizes exceptionThrown into an error entry without exception content", () => {
-    const secret = `p09-exc-secret-${"cd".repeat(8)}`;
+    const secret = `exc-secret-${"cd".repeat(8)}`;
     const entry = normalizeExceptionThrown(
       { exceptionDetails: { text: "Uncaught", exception: { description: secret }, stackTrace: { callFrames: [] } } },
       TS,
@@ -149,7 +149,7 @@ describe("P09 console event normalization", () => {
   });
 });
 
-describe("P09 network monitor: ingest/correlation/eviction/clear", () => {
+describe("network monitor: ingest/correlation/eviction/clear", () => {
   function requestParams(url: string, headers: Record<string, string> = {}, extra: Record<string, unknown> = {}) {
     return {
       requestId: "1",
@@ -201,7 +201,7 @@ describe("P09 network monitor: ingest/correlation/eviction/clear", () => {
 
   it("never exposes postData bodies (hasPostData flag only)", () => {
     const monitor = new NetworkMonitor(10);
-    const bodySecret = `p09-post-body-${"ef".repeat(8)}`;
+    const bodySecret = `post-body-${"ef".repeat(8)}`;
     monitor.requestWillBeSent(
       "raw-p",
       requestParams("https://example.test/submit", {}, { hasPostData: true, postData: bodySecret }),
@@ -255,7 +255,7 @@ describe("P09 network monitor: ingest/correlation/eviction/clear", () => {
   });
 
   it("projectHeaders redacts mixed-case sensitive headers", () => {
-    const secret = `p09-hdr-secret-${"12".repeat(8)}`;
+    const secret = `hdr-secret-${"12".repeat(8)}`;
     const out = projectHeaders({ aUtHoRiZaTiOn: `Bearer ${secret}`, COOKIE: secret, "X-Custom": "ok" });
     expect(out["aUtHoRiZaTiOn"]).toBe("[REDACTED]");
     expect(out["COOKIE"]).toBe("[REDACTED]");
@@ -264,7 +264,7 @@ describe("P09 network monitor: ingest/correlation/eviction/clear", () => {
   });
 });
 
-describe("P09 observability config", () => {
+describe("observability config", () => {
   it("uses defaults when unset", () => {
     expect(resolveBufferCapacity(undefined, CONSOLE_BUFFER_DEFAULT_ENTRIES, CONSOLE_BUFFER_HARD_MAX_ENTRIES)).toEqual({
       ok: true,

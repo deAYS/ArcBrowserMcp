@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { P10_FROZEN_PUBLIC_TOOLS } from "../release/toolsetSecurity.test.js";
+import { FROZEN_PUBLIC_TOOLS } from "../release/toolsetSecurity.test.js";
 import {
   BOUND_MS,
   POLL_INTERVAL_MS,
@@ -14,7 +14,7 @@ import {
 } from "./liveHelpers.js";
 
 /**
- * P10 full release matrix over MCP (opt-in via pnpm test:release; never runs
+ * Full release matrix over MCP (opt-in via pnpm test:release; never runs
  * under plain pnpm test). Disposable 127.0.0.1 fixture tabs only; every
  * currently registered public browser tool is exercised with cross-feature
  * semantics (refs, selection, redaction, privileged negatives). Pre-existing
@@ -22,9 +22,9 @@ import {
  */
 
 const FIXTURE_HTML = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>P10 Release Home</title></head>
+<html lang="en"><head><meta charset="utf-8"><title>Release Home</title></head>
 <body>
-<h1>P10 Release Fixture</h1>
+<h1>Release Fixture</h1>
 <div id="status" role="status">status: ready</div>
 <div id="delayed" role="status">waiting</div>
 <label>Name <input id="name" type="text" value="known"></label>
@@ -33,21 +33,21 @@ const FIXTURE_HTML = `<!doctype html>
 <button id="submit" type="button">Submit</button>
 <script>
 document.getElementById("trigger").addEventListener("click", async () => {
-  console.log("p10-release-marker-log");
-  try { await fetch("./api/data?access_token=p10_release_url_secret&page=2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: "p10-release-request-body-sentinel" }) }).then((r) => r.text()); } catch {}
+  console.log("release-marker-log");
+  try { await fetch("./api/data?access_token=release_url_secret&page=2", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: "release-request-body-sentinel" }) }).then((r) => r.text()); } catch {}
   document.getElementById("status").textContent = "status: triggered";
 });
 document.getElementById("submit").addEventListener("click", () => {
   document.getElementById("status").textContent = "status: clicked";
 });
-setTimeout(() => { document.getElementById("delayed").textContent = "delayed-token-p10-visible"; }, 1500);
-setTimeout(() => { document.title = "P10 Release Delayed"; }, 2500);
+setTimeout(() => { document.getElementById("delayed").textContent = "delayed-token-visible"; }, 1500);
+setTimeout(() => { document.title = "Release Delayed"; }, 2500);
 </script>
 </body></html>`;
 
 const NEXT_HTML = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>P10 Release Next</title></head>
-<body><h1>P10 Release Next</h1><div id="status" role="status">status: next</div></body></html>`;
+<html lang="en"><head><meta charset="utf-8"><title>Release Next</title></head>
+<body><h1>Release Next</h1><div id="status" role="status">status: next</div></body></html>`;
 
 let ctx: LiveContext | null = null;
 
@@ -66,7 +66,7 @@ function structuredSnapshot(result: Awaited<ReturnType<typeof callTool>>): { sna
   return result.structuredContent as { snapshotId: string; tabId: string; nodes: Array<{ ref?: string; role: string; name?: string; value?: string }>; text: string };
 }
 
-describe("P10 release matrix over MCP", () => {
+describe("release matrix over MCP", () => {
   it(
     "exercises every registered public tool with cross-feature semantics",
     async () => {
@@ -90,22 +90,22 @@ describe("P10 release matrix over MCP", () => {
           req.on("end", () => {
             void received;
             res.writeHead(200, { "content-type": "application/json", "X-Test-Safe-Response": "safe" });
-            res.end(JSON.stringify({ ok: true, echo: "p10-release-response-body-sentinel" }));
+            res.end(JSON.stringify({ ok: true, echo: "release-response-body-sentinel" }));
           });
           return;
         }
         res.writeHead(404, { "content-type": "text/plain" });
         res.end("not found");
       });
-      ctx = await startLiveSession("arc-mcp-p10-release-client");
+      ctx = await startLiveSession("arc-mcp-release-test-client");
       ctx.fixtureServer = server;
       const fixtureUrl = `${base}/`;
       const nextUrl = `${base}/next`;
 
-      // Registered tool set matches the frozen P10 list (zero new tools).
+      // Registered tool set matches the frozen list (zero new tools).
       const { tools } = await ctx.client.listTools();
       const names = tools.map((t) => t.name).sort();
-      expect(names).toEqual([...P10_FROZEN_PUBLIC_TOOLS]);
+      expect(names).toEqual([...FROZEN_PUBLIC_TOOLS]);
 
       // Status + tabs.
       const status0 = await callTool(ctx.client, "browser_status");
@@ -155,7 +155,7 @@ describe("P10 release matrix over MCP", () => {
       const keyed = await callTool(ctx.client, "browser_press_key", { key: "Enter" });
       expect(keyed.isError).not.toBe(true);
       // Password: fill a sentinel; snapshot + getText never expose it.
-      const sentinel = "p10-release-password-sentinel-9f3a";
+      const sentinel = "release-password-sentinel-9f3a";
       snapshot = structuredSnapshot(await callTool(ctx.client, "browser_snapshot"));
       const secretRef = snapshot.nodes.find((n) => n.name === "Secret" && n.ref !== undefined)?.ref;
       if (secretRef === undefined) {
@@ -195,7 +195,7 @@ describe("P10 release matrix over MCP", () => {
       }
       // Wait for the delayed token rather than assuming timing.
       const waited = await callTool(ctx.client, "browser_wait_for", {
-        condition: { type: "text", value: "delayed-token-p10-visible" },
+        condition: { type: "text", value: "delayed-token-visible" },
         timeoutMs: 30_000,
       });
       expect(waited.isError).not.toBe(true);
@@ -218,7 +218,7 @@ describe("P10 release matrix over MCP", () => {
         for (;;) {
           const current = await callTool(ctx.client, "browser_console", { action: "get" });
           const payload = current.structuredContent as { entries?: Array<{ text?: string }> } | undefined;
-          if (Array.isArray(payload?.entries) && payload.entries.some((e) => (e.text ?? "").includes("p10-release-marker-log"))) {
+          if (Array.isArray(payload?.entries) && payload.entries.some((e) => (e.text ?? "").includes("release-marker-log"))) {
             sawConsole = true;
             break;
           }
@@ -236,9 +236,9 @@ describe("P10 release matrix over MCP", () => {
           if (Array.isArray(payload?.entries) && payload.entries.some((e) => (e.url ?? "").includes("/api/data"))) {
             sawNetwork = true;
             const serialized = JSON.stringify(payload);
-            expect(serialized).not.toContain("p10-release-request-body-sentinel");
-            expect(serialized).not.toContain("p10-release-response-body-sentinel");
-            expect(serialized).not.toContain("p10_release_url_secret");
+            expect(serialized).not.toContain("release-request-body-sentinel");
+            expect(serialized).not.toContain("release-response-body-sentinel");
+            expect(serialized).not.toContain("release_url_secret");
             expect(serialized).not.toContain("postData");
             expect(serialized).not.toContain("requestId");
             break;

@@ -1,5 +1,5 @@
 /**
- * Shared helpers for P10 live release/soak/reconnect suites.
+ * Shared helpers for live release/soak/reconnect suites.
  *
  * Every live suite MUST:
  * - use only disposable 127.0.0.1 fixture tabs + no-URL privileged tabs,

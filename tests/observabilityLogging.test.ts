@@ -14,7 +14,7 @@ import {
 } from "../extension/src/snapshot.js";
 
 /**
- * P09 observability logging boundary (mocked/static, prelive).
+ * Observability logging boundary (mocked/static).
  *
  * Console payloads, header values, URLs-before-redaction, bodies, and raw
  * debugger event params must never reach any diagnostic surface:
@@ -29,10 +29,10 @@ import {
  * them.
  */
 
-const CONSOLE_SENTINEL = `p09-log-console-${"d4".repeat(8)}-boundary`;
-const HEADER_SENTINEL = `p09-log-header-${"e5".repeat(8)}-boundary`;
-const URL_SENTINEL = `p09-log-url-${"f6".repeat(8)}-boundary`;
-const BODY_SENTINEL = `p09-log-body-${"07".repeat(8)}-boundary`;
+const CONSOLE_SENTINEL = `log-console-${"d4".repeat(8)}-boundary`;
+const HEADER_SENTINEL = `log-header-${"e5".repeat(8)}-boundary`;
+const URL_SENTINEL = `log-url-${"f6".repeat(8)}-boundary`;
+const BODY_SENTINEL = `log-body-${"07".repeat(8)}-boundary`;
 
 function collectingLogger(): { logger: Logger; entries: string[] } {
   const entries: string[] = [];
@@ -51,7 +51,7 @@ function collectingLogger(): { logger: Logger; entries: string[] } {
   };
 }
 
-describe("P09 observability logging boundary", () => {
+describe("observability logging boundary", () => {
   it("MCP pipe server logs never contain observability payloads", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), "arc-mcp-obs-pipe-"));
     try {

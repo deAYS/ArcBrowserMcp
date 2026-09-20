@@ -12,7 +12,7 @@ import { loadExtensionIdentity } from "../../src/bridge/extensionIdentity.js";
 import { createServer } from "../../src/server/server.js";
 
 /**
- * Real ArcExtensionEngine + MCP integration (P03C, opt-in via
+ * Real ArcExtensionEngine + MCP integration (opt-in via
  * pnpm test:extension-engine; never runs under plain pnpm test).
  *
  * Uses the already-loaded real Arc extension (no tabs, no debugger, no
@@ -59,7 +59,7 @@ describe("real extension engine over MCP", () => {
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
       handle = serveStdio(() => createServer(service), { transport: serverTransport });
       const testClient = new Client(
-        { name: "arc-mcp-p03c-test-client", version: "0.0.0" },
+        { name: "arc-mcp-test-client", version: "0.0.0" },
         { versionNegotiation: { mode: { pin: "2026-07-28" } } },
       );
       client = testClient;

@@ -12,7 +12,7 @@ const PROJECT = `t-${"e".repeat(32)}-61`;
 
 function axTree(): Record<string, unknown>[] {
   return [
-    { nodeId: "1", role: { value: "heading" }, name: { value: "P09 Fixture" }, backendDOMNodeId: 601, childIds: ["2"] },
+    { nodeId: "1", role: { value: "heading" },       name: { value: "Fixture" }, backendDOMNodeId: 601, childIds: ["2"] },
     { nodeId: "2", role: { value: "link" }, name: { value: "More" }, backendDOMNodeId: 602 },
   ];
 }
@@ -67,7 +67,7 @@ function enableMethods(commands: Harness["commands"]): string[] {
   return commands.map((command) => command.method);
 }
 
-describe("P09 debugger/lifecycle: console monitoring", () => {
+describe("debugger/lifecycle: console monitoring", () => {
   it("first get attaches safely + Runtime.enable; repeat does not re-enable", async () => {
     const fixture = harness();
     const first = await fixture.manager.getConsole(PROJECT);
@@ -251,7 +251,7 @@ describe("P09 debugger/lifecycle: console monitoring", () => {
   });
 });
 
-describe("P09 debugger/lifecycle: network monitoring", () => {
+describe("debugger/lifecycle: network monitoring", () => {
   it("first get attaches safely + Network.enable; repeat does not re-enable", async () => {
     const fixture = harness();
     const first = await fixture.manager.getNetwork(PROJECT);
@@ -300,8 +300,8 @@ describe("P09 debugger/lifecycle: network monitoring", () => {
       { generateSessionId: () => SESSION },
     );
     manager.setRetireDetachTimeoutMsForTests(5_000);
-    // Attach first so the timeout retires a positively-owned session (the
-    // P08 onDetach-during-retirement precedent). Without a prior attach the
+    // Attach first so the timeout retires a positively-owned session.
+    // Without a prior attach the
     // evaluate path never owns the session and no retirement occurs.
     await manager.ensureConsoleMonitoring(PROJECT);
     expect(manager.debuggerSessionState(61)).toBe("OWNED");

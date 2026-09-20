@@ -16,18 +16,18 @@ import type { NativePort } from "../../extension/src/bridge.js";
 const EXTENSION_ID = "abcdefghijklmnopabcdefghijklmnop";
 
 async function tempDir(): Promise<{ dir: string; cleanup: () => Promise<void> }> {
-  const dir = await mkdtemp(path.join(os.tmpdir(), "arc-mcp-p10-relay-"));
+  const dir = await mkdtemp(path.join(os.tmpdir(), "arc-mcp-relay-"));
   return { dir, cleanup: () => rm(dir, { recursive: true, force: true }) };
 }
 
 let pipeSerial = 0;
 function freshPipeName(): string {
   pipeSerial += 1;
-  return `\\\\.\\pipe\\arc-mcp-p10-${String(process.pid)}-${String(pipeSerial)}`;
+  return `\\\\.\\pipe\\arc-mcp-relay-${String(process.pid)}-${String(pipeSerial)}`;
 }
 
 /**
- * P10 relay lifecycle: one authenticated relay per bridge instance.
+ * Relay lifecycle: one authenticated relay per bridge instance.
  *
  * - Duplicate/stale hello never replaces the current authoritative relay.
  * - Pipe disconnect invalidates the peer and rejects pending RPC.
@@ -67,7 +67,7 @@ async function authedRelay(
   return { socket, decoder };
 }
 
-describe("P10 relay single-authoritative-session", () => {
+describe("relay single-authoritative-session", () => {
   it("rejects a duplicate hello while a relay is authoritative (fault F)", async () => {
     const { dir, cleanup } = await tempDir();
     try {
@@ -328,7 +328,7 @@ function mockPort(): NativePort & {
   return port;
 }
 
-describe("P10 extension reconnect scheduling (single authoritative path)", () => {
+describe("extension reconnect scheduling (single authoritative path)", () => {
   it("duplicate alarms/disconnects schedule exactly one retry; late callbacks cannot corrupt a healthy port", async () => {
     const { vi } = await import("vitest");
     vi.useFakeTimers();
@@ -379,7 +379,7 @@ class FakeEngineRuntime extends BridgeRuntime {
   private readonly listeners = new Set<(connected: boolean) => void>();
 
   constructor() {
-    super({ pipeName: "\\\\.\\pipe\\arc-mcp-p10-engine", sessionDir: "C:\\arc-mcp-p10-engine" });
+    super({ pipeName: "\\\\.\\pipe\\arc-mcp-test-engine", sessionDir: "C:\\arc-mcp-test-engine" });
   }
 
   override async start(): Promise<void> {}
@@ -410,7 +410,7 @@ class FakeEngineRuntime extends BridgeRuntime {
   }
 }
 
-describe("P10 engine status truthfulness", () => {
+describe("engine status truthfulness", () => {
   it("connected requires live relay; disconnect/recovery converge without restart", async () => {
     const runtime = new FakeEngineRuntime();
     const engine = new ArcExtensionEngine({

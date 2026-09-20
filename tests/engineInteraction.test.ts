@@ -179,7 +179,7 @@ describe("engine interaction selection gating", () => {
   });
 
   it("returns getText text and validates the envelope; errors never echo secrets", async () => {
-    const sentinel = `p07-secret-sentinel-${"ab".repeat(8)}`;
+    const sentinel = `test-secret-sentinel-${"ab".repeat(8)}`;
     const { engine, runtime } = harness();
     await engine.connect();
     await engine.selectTab(TAB_A);

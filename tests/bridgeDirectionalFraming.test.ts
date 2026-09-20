@@ -19,12 +19,12 @@ import { parseSessionDescriptor } from "../src/bridge/session.js";
 import type { BridgeSession } from "../src/bridge/session.js";
 
 /**
- * P08T directional transport capacity (mocked/static, prelive).
+ * Directional transport capacity (mocked/static).
  *
  * The bridge codec carries two payload classes over one length-prefixed
  * framing: SMALL (256 KiB) for every request/command path and all
  * host->extension traffic, LARGE (16 MiB) for extension-originated
- * responses only (the future screenshot direction). These tests prove the
+ * responses only (the screenshot direction). These tests prove the
  * direction roles enforce the right bound at every layer without chunking,
  * streaming, or touching the extension.
  */
@@ -43,7 +43,7 @@ function headerOnly(declaredLength: number): Buffer {
   return header;
 }
 
-describe("P08T capacity model constants", () => {
+describe("capacity model constants", () => {
   it("declares the approved directional bounds", () => {
     expect(SMALL).toBe(256 * 1024);
     expect(LARGE).toBe(16 * 1024 * 1024);
@@ -60,7 +60,7 @@ describe("P08T capacity model constants", () => {
   });
 });
 
-describe("P08T small direction (requests, host->extension)", () => {
+describe("small direction (requests, host->extension)", () => {
   it("round-trips a normal small frame with the default role", () => {
     const encoded = encodeNativeMessage({ type: "request", id: "s-1" });
     expect(new NativeFrameDecoder().push(encoded)).toEqual([{ type: "request", id: "s-1" }]);
@@ -117,7 +117,7 @@ describe("P08T small direction (requests, host->extension)", () => {
   });
 });
 
-describe("P08T large response direction (extension-originated only)", () => {
+describe("large response direction (extension-originated only)", () => {
   it("carries a 256 KiB+ response and a representative ~2 MiB response", () => {
     for (const bytes of [300 * 1024, 2 * 1024 * 1024]) {
       const payload = { id: "r", blob: "z".repeat(bytes) };
@@ -175,7 +175,7 @@ describe("P08T large response direction (extension-originated only)", () => {
 const ORIGIN = "chrome-extension://abcdefghijklmnopabcdefghijklmnop/";
 const SESSION: BridgeSession = {
   version: 1,
-  pipeName: "\\\\.\\pipe\\p08t-test",
+  pipeName: "\\\\.\\pipe\\directional-test",
   nonceHex: "a".repeat(64),
   mcpPid: 4242,
   createdAt: new Date().toISOString(),
@@ -273,7 +273,7 @@ async function waitFor(condition: () => boolean, label: string, timeoutMs = 10_0
   }
 }
 
-describe("P08T native-host relay directions", () => {
+describe("native-host relay directions", () => {
   it("forwards a >256 KiB extension response to the pipe and stays alive", async () => {
     const h = hostHarness({ onSocket: (socket) => answerHello(socket) });
     const completed = runHost({ ...h.base, argv: [ORIGIN] });
@@ -323,11 +323,11 @@ describe("P08T native-host relay directions", () => {
   });
 });
 
-describe("P08T pipe server directions (real loopback pipe)", () => {
+describe("pipe server directions (real loopback pipe)", () => {
   it("decodes a >256 KiB relay event while small requests stay bounded", async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), "arc-mcp-p08t-"));
+    const dir = await mkdtemp(path.join(os.tmpdir(), "arc-mcp-directional-"));
     try {
-      const pipeName = `\\\\.\\pipe\\arc-mcp-p08t-${String(process.pid)}`;
+      const pipeName = `\\\\.\\pipe\\arc-mcp-directional-${String(process.pid)}`;
       const server = new McpPipeServer({ pipeName, sessionDir: dir, applyPipeAcl: () => Promise.resolve() });
       await server.start();
       const session = parseSessionDescriptor(await readFile(path.join(dir, "bridge-session.json"), "utf-8"));

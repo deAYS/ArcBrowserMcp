@@ -5,7 +5,7 @@ import { StdioClientTransport, getDefaultEnvironment } from "@modelcontextprotoc
 import pkg from "../package.json" with { type: "json" };
 
 /**
- * P01 integration tests: real MCP v2 client fixtures speaking to the real
+ * Integration tests: real MCP v2 client fixtures speaking to the real
  * server process over stdio. Nothing here invokes tool handlers directly;
  * every assertion goes through the transport/protocol layer.
  *
@@ -49,10 +49,10 @@ async function spawnServer(envExtra: Record<string, string> = {}, modern = true)
   }
   const client = modern
     ? new Client(
-        { name: "arc-mcp-p01-test-client", version: "0.0.0" },
+        { name: "arc-mcp-test-client", version: "0.0.0" },
         { versionNegotiation: { mode: { pin: MODERN_VERSION } } },
       )
-    : new Client({ name: "arc-mcp-p01-legacy-client", version: "0.0.0" });
+    : new Client({ name: "arc-mcp-legacy-client", version: "0.0.0" });
   await client.connect(transport);
   return { client, transport, stderrText: () => text };
 }
@@ -85,7 +85,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
   }
 }
 
-describe("P01-AC1: pinned 2026-07-28 connect, era, and tool discovery", () => {
+describe("pinned 2026-07-28 connect, era, and tool discovery", () => {
   it(
     "modern-pinned client negotiates the modern era and lists browser_status",
     async () => {
@@ -106,7 +106,7 @@ describe("P01-AC1: pinned 2026-07-28 connect, era, and tool discovery", () => {
   );
 });
 
-describe("P01-AC1-legacy: default client compatibility", () => {
+describe("legacy default client compatibility", () => {
   it(
     "default (legacy) client can still connect via serveStdio dual-era support",
     async () => {
@@ -120,7 +120,7 @@ describe("P01-AC1-legacy: default client compatibility", () => {
   );
 });
 
-describe("P01-AC2: browser_status over the modern connection", () => {
+describe("browser_status over the modern connection", () => {
   it(
     "invokes browser_status and receives disconnected state",
     async () => {
@@ -142,7 +142,7 @@ describe("P01-AC2: browser_status over the modern connection", () => {
   );
 });
 
-describe("P01-AC3: diagnostics on stderr do not corrupt modern MCP stdio", () => {
+describe("diagnostics on stderr do not corrupt modern MCP stdio", () => {
   it(
     "server logs to stderr while modern protocol traffic succeeds",
     async () => {
@@ -176,7 +176,7 @@ describe("P01-AC3: diagnostics on stderr do not corrupt modern MCP stdio", () =>
   );
 });
 
-describe("P01-AC4: SIGINT closes the server cleanly", () => {
+describe("SIGINT closes the server cleanly", () => {
   it(
     "server shuts down on SIGINT without hanging",
     async () => {

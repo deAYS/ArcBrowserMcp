@@ -12,7 +12,7 @@ const TS_HINT = "2026-01-01T00:00:00.000Z";
 
 function axTree(): Record<string, unknown>[] {
   return [
-    { nodeId: "1", role: { value: "heading" }, name: { value: "P09 Fixture" }, backendDOMNodeId: 701 },
+    { nodeId: "1", role: { value: "heading" },       name: { value: "Fixture" }, backendDOMNodeId: 701 },
   ];
 }
 
@@ -47,10 +47,10 @@ function harness(): Harness {
   return { manager, commands };
 }
 
-const AUTH_SECRET = `p09-route-auth-${"aa".repeat(8)}`;
-const URL_SECRET = `p09-route-url-${"bb".repeat(8)}`;
+const AUTH_SECRET = `route-auth-${"aa".repeat(8)}`;
+const URL_SECRET = `route-url-${"bb".repeat(8)}`;
 
-describe("P09 event routing", () => {
+describe("event routing", () => {
   it("ingests consoleAPICalled levels/primitives with timestamp+source", async () => {
     const fixture = harness();
     await fixture.manager.ensureConsoleMonitoring(PROJECT);

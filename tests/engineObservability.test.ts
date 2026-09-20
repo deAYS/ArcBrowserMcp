@@ -15,13 +15,13 @@ import type { BrowserTab } from "../src/browser/models.js";
 const EXTENSION_ID = "abcdefghijklmnopabcdefghijklmnop";
 const TAB_A = `t-${"d".repeat(32)}-71`;
 
-const CONSOLE_SENTINEL = `p09-engine-console-${"a1".repeat(8)}`;
-const NETWORK_SENTINEL = `p09-engine-network-${"b2".repeat(8)}`;
+const CONSOLE_SENTINEL = `engine-console-${"a1".repeat(8)}`;
+const NETWORK_SENTINEL = `engine-network-${"b2".repeat(8)}`;
 
 function makeRecord(id: string, overrides: Partial<BrowserTab> = {}): BrowserTab {
   return {
     id,
-    title: "P09 Fixture",
+    title: "Fixture",
     url: "https://fixture.local/",
     active: true,
     pinned: false,

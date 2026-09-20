@@ -13,7 +13,7 @@ import { loadExtensionIdentity } from "../../src/bridge/extensionIdentity.js";
 import { createServer } from "../../src/server/server.js";
 
 /**
- * Real snapshot lifecycle over MCP (P06, opt-in via pnpm test:snapshot;
+ * Real snapshot lifecycle over MCP (opt-in via pnpm test:snapshot;
  * never runs under plain pnpm test). Disposable tab only; pre-existing
  * user tabs are recorded first and must remain present with unchanged
  * URLs/pinned state at the end. No click/type/evaluate/screenshot.
@@ -151,7 +151,7 @@ describe("real snapshot lifecycle over MCP", () => {
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
       handle = serveStdio(() => createServer(service), { transport: serverTransport });
       const testClient = new Client(
-        { name: "arc-mcp-p06-test-client", version: "0.0.0" },
+        { name: "arc-mcp-snapshot-test-client", version: "0.0.0" },
         { versionNegotiation: { mode: { pin: "2026-07-28" } } },
       );
       client = testClient;

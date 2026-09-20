@@ -17,7 +17,7 @@ const TINY_PNG =
 function makeRecord(id: string, overrides: Partial<BrowserTab> = {}): BrowserTab {
   return {
     id,
-    title: "P08 Fixture",
+    title: "Fixture",
     url: "https://fixture.local/",
     active: true,
     pinned: false,
@@ -169,7 +169,7 @@ describe("engine evaluate gating and mapping", () => {
 
   it("returns by-value results and never echoes the expression", async () => {
     const { engine, runtime } = await connectSelected();
-    const sentinel = `p08-engine-secret-${"f6".repeat(8)}`;
+    const sentinel = `engine-secret-${"f6".repeat(8)}`;
     runtime.handler = (method, payload) => {
       expect(method).toBe("runtime.evaluate");
       expect(payload["tabId"]).toBe(TAB_A);
@@ -300,7 +300,7 @@ describe("engine waitFor gating, stability, and mapping", () => {
   it("times out with a typed error that never echoes condition text", async () => {
     const { engine, runtime } = await connectSelected();
     runtime.handler = () => ({ matched: false, observed: "" });
-    const sentinel = `p08-wait-secret-${"a7".repeat(8)}`;
+    const sentinel = `wait-secret-${"a7".repeat(8)}`;
     let code = "";
     let message = "";
     try {

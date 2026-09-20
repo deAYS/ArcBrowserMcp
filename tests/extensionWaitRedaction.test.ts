@@ -9,7 +9,7 @@ import {
 const SESSION = "d".repeat(32);
 const PROJECT = `t-${"d".repeat(32)}-51`;
 
-const SENTINEL = `p08-wait-secret-${"b8".repeat(8)}-must-stay-hidden`;
+const SENTINEL = `wait-secret-${"b8".repeat(8)}-must-stay-hidden`;
 
 type AxNode = Record<string, unknown>;
 
@@ -18,7 +18,7 @@ function tree(): AxNode[] {
     {
       nodeId: "1",
       role: { value: "heading" },
-      name: { value: "P08 Fixture" },
+      name: { value: "Fixture" },
       backendDOMNodeId: 501,
       childIds: ["2", "3", "4"],
     },
@@ -94,7 +94,7 @@ function harness(): Harness {
   return { manager, commands };
 }
 
-describe("P08 wait text redaction parity (sentinel regression)", () => {
+describe("wait text redaction parity (sentinel regression)", () => {
   it("snapshot/getText redact the sentinel and wait corpus is unsearchable for it", async () => {
     const fixture = harness();
     const captured = await fixture.manager.capture(PROJECT);
@@ -107,9 +107,9 @@ describe("P08 wait text redaction parity (sentinel regression)", () => {
     const text = await fixture.manager.getElementText(PROJECT, heading);
     expect(text.text).not.toContain(SENTINEL);
 
-    // The P08 wait corpus is the exact search surface wait_for(text) uses.
+    // The wait corpus is the exact search surface wait_for(text) uses.
     const corpus = await fixture.manager.waitTextCorpus(PROJECT);
-    expect(corpus).toContain("P08 Fixture");
+    expect(corpus).toContain("Fixture");
     expect(corpus).toContain("public visible value");
     expect(corpus).not.toContain(SENTINEL);
   });

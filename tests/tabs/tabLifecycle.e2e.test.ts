@@ -13,7 +13,7 @@ import { loadExtensionIdentity } from "../../src/bridge/extensionIdentity.js";
 import { createServer } from "../../src/server/server.js";
 
 /**
- * Real tab lifecycle over MCP (P04, opt-in via pnpm test:tabs; never runs
+ * Real tab lifecycle over MCP (opt-in via pnpm test:tabs; never runs
  * under plain pnpm test). Uses the already-loaded real Arc extension with
  * disposable tabs only: example.com plus one natural blank tab. Pre-existing
  * user tabs are recorded first and must remain present at the end. No
@@ -117,7 +117,7 @@ describe("real tab lifecycle over MCP", () => {
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
       handle = serveStdio(() => createServer(service), { transport: serverTransport });
       const testClient = new Client(
-        { name: "arc-mcp-p04-test-client", version: "0.0.0" },
+        { name: "arc-mcp-tabs-test-client", version: "0.0.0" },
         { versionNegotiation: { mode: { pin: "2026-07-28" } } },
       );
       client = testClient;

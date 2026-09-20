@@ -221,8 +221,8 @@ describe("ArcExtensionEngine lifecycle", () => {
   }, 30_000);
 });
 
-describe("ArcExtensionEngine P08 page tools", () => {
-  it("P08 operations are implemented (no not-implemented stub)", async () => {
+describe("ArcExtensionEngine page tools", () => {
+  it("page tool operations are implemented (no not-implemented stub)", async () => {
     const { engine } = engineWith();
     expect(engine.evaluate).toBeDefined();
     expect(engine.screenshot).toBeDefined();

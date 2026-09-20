@@ -13,7 +13,7 @@ import { loadExtensionIdentity } from "../../src/bridge/extensionIdentity.js";
 import { createServer } from "../../src/server/server.js";
 
 /**
- * Real navigation lifecycle over MCP (P05, opt-in via pnpm test:navigation;
+ * Real navigation lifecycle over MCP (opt-in via pnpm test:navigation;
  * never runs under plain pnpm test). Disposable seed tab only; pre-existing
  * user tabs are snapshotted (id, URL, pinned) and must remain present with
  * unchanged URLs at the end. Bounded listTabs polling is test infrastructure
@@ -199,7 +199,7 @@ async function logRawHistoryProbe(tabId: string, direction: "back" | "forward"):
         ? String((error as { code: unknown }).code)
         : "?";
     // eslint-disable-next-line no-console
-    console.log(`[p05-ac2] raw ${direction} probe code=${code} details=${details} message=${message.slice(0, 800)}`);
+    console.log(`[nav-history] raw ${direction} probe code=${code} details=${details} message=${message.slice(0, 800)}`);
   }
 }
 
@@ -235,7 +235,7 @@ describe("real navigation lifecycle over MCP", () => {
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
       handle = serveStdio(() => createServer(service), { transport: serverTransport });
       const testClient = new Client(
-        { name: "arc-mcp-p05-test-client", version: "0.0.0" },
+        { name: "arc-mcp-navigation-test-client", version: "0.0.0" },
         { versionNegotiation: { mode: { pin: "2026-07-28" } } },
       );
       client = testClient;
@@ -248,9 +248,9 @@ describe("real navigation lifecycle over MCP", () => {
         const preexisting = before.tabs.map((tab) => ({ id: tab.id, url: tab.url, pinned: tab.pinned }));
         const originallyActive = before.tabs.find((tab) => tab.active)?.id;
 
-        const urlSeed = `https://example.com/?arc-mcp-p05=seed-${runId}`;
-        const urlA = `https://example.net/?arc-mcp-p05=a-${runId}`;
-        const urlB = `https://example.org/?arc-mcp-p05=b-${runId}`;
+      const urlSeed = `https://example.com/?arc-mcp-nav=seed-${runId}`;
+      const urlA = `https://example.net/?arc-mcp-nav=a-${runId}`;
+      const urlB = `https://example.org/?arc-mcp-nav=b-${runId}`;
 
         // Disposable seed tab at an explicit safe HTTPS URL; becomes selected.
         // (Arc's no-URL new tab is a privileged source the agent must not
@@ -288,7 +288,7 @@ describe("real navigation lifecycle over MCP", () => {
         await pollTabCommitted(blankId, urlB, "B");
         await settleHistoryGap("A-B-committed");
 
-        // Revised P05-AC2: back/forward must invoke Arc's native history APIs
+        // Back/forward must invoke Arc's native history APIs
         // and either traverse browser-owned history (same TabId/selection,
         // browser truth on expected URL) or return typed
         // BROWSER_HISTORY_UNAVAILABLE when Arc exposes no traversable entry.
@@ -374,7 +374,7 @@ describe("real navigation lifecycle over MCP", () => {
         expect(arcNewTabSeen, "Arc no-URL tab must still be listed").toBeDefined();
         // Arc's no-URL tab reports empty/pending, chrome://newtab/, or
         // arc://newtab/ depending on commit timing; all are non-navigable
-        // privileged states for P05. Accept any of these observations, but
+        // privileged states here. Accept any of these observations, but
         // require non-controllable + typed rejection (never UNKNOWN_METHOD).
         expect(arcNewTabSeen?.controllable).toBe(false);
         const privileged = await callTool("browser_navigate", { url: urlA });

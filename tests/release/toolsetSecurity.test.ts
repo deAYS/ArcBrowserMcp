@@ -42,8 +42,8 @@ function registeredToolNames(): string[] {
   return [...new Set(names)].sort();
 }
 
-/** P10 frozen public tool set: recorded at phase start, must not expand. */
-export const P10_FROZEN_PUBLIC_TOOLS = [
+/** Frozen public tool set: must not expand. */
+export const FROZEN_PUBLIC_TOOLS = [
   "browser_click",
   "browser_close_tab",
   "browser_console",
@@ -66,10 +66,10 @@ export const P10_FROZEN_PUBLIC_TOOLS = [
   "browser_wait_for",
 ] as const;
 
-describe("P10 public tool set is frozen (no feature expansion)", () => {
+describe("public tool set is frozen (no feature expansion)", () => {
   it("registers exactly the 20 approved tools and no more", () => {
     const actual = registeredToolNames();
-    expect(actual).toEqual([...P10_FROZEN_PUBLIC_TOOLS]);
+    expect(actual).toEqual([...FROZEN_PUBLIC_TOOLS]);
     expect(actual).toHaveLength(20);
   });
 
@@ -90,7 +90,7 @@ describe("P10 public tool set is frozen (no feature expansion)", () => {
   });
 });
 
-describe("P10 final static security audit", () => {
+describe("final static security audit", () => {
   it("forbids body/traversal CDP methods in production sources", () => {
     const productionFiles = [
       "extension/src/snapshot.ts",

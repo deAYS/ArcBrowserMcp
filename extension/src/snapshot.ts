@@ -1011,7 +1011,7 @@ export class DebuggerSessionManager {
       if (DebuggerSessionManager.isFileControl(info)) {
         throw new SnapshotError(
           "ELEMENT_NOT_INTERACTABLE",
-          "file inputs cannot be clicked (no OS file picker in P07)",
+          "file inputs cannot be clicked (no OS file picker is available)",
         );
       }
       const point = await this.clickPoint(chromeId, backendNodeId);
@@ -1062,7 +1062,7 @@ export class DebuggerSessionManager {
       if (DebuggerSessionManager.isFileControl(info)) {
         throw new SnapshotError(
           "ELEMENT_NOT_EDITABLE",
-          "file inputs cannot be filled (no file upload in P07)",
+          "file inputs cannot be filled (file upload is not supported)",
         );
       }
       if (!DebuggerSessionManager.isEditableControl(info)) {
@@ -1097,7 +1097,7 @@ export class DebuggerSessionManager {
       if (DebuggerSessionManager.isFileControl(info)) {
         throw new SnapshotError(
           "ELEMENT_NOT_EDITABLE",
-          "file inputs cannot be typed into (no file upload in P07)",
+          "file inputs cannot be typed into (file upload is not supported)",
         );
       }
       if (!DebuggerSessionManager.isEditableControl(info)) {

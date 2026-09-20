@@ -70,11 +70,11 @@ function harness(tabUrl = "https://fixture.local/"): Harness {
 }
 
 /**
- * P10 debugger/resource lifecycle convergence: repeated mixed operations
+ * Debugger/resource lifecycle convergence: repeated mixed operations
  * reuse one owned attachment, re-enable domains only as needed, and leave
  * bounded state after cleanup.
  */
-describe("P10 debugger lifecycle stress (mocked)", () => {
+describe("debugger lifecycle stress (mocked)", () => {
   it("repeated mixed ops reuse one attachment with no attach storm", async () => {
     const fixture = harness();
     await fixture.manager.capture(PROJECT);
@@ -148,7 +148,7 @@ describe("P10 debugger lifecycle stress (mocked)", () => {
   });
 });
 
-describe("P10 bounded-resource verification (mocked)", () => {
+describe("bounded-resource verification (mocked)", () => {
   it("console respects default, custom, and hard-max capacities with exact dropped counts", () => {
     const monitor = new ConsoleMonitor(CONSOLE_BUFFER_DEFAULT_ENTRIES);
     for (let i = 0; i < CONSOLE_BUFFER_DEFAULT_ENTRIES + 50; i += 1) {

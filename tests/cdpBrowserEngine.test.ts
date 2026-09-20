@@ -244,7 +244,7 @@ describe("CdpBrowserEngine future operations", () => {
 });
 
 describe("BrowserService without an engine", () => {
-  it("keeps the P01 disconnected placeholder contract", async () => {
+  it("keeps the disconnected placeholder contract", async () => {
     const status = await new BrowserService().getStatus();
     expect(status).toMatchObject({
       connected: false,

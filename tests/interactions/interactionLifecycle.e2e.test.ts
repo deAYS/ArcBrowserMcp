@@ -15,7 +15,7 @@ import { loadExtensionIdentity } from "../../src/bridge/extensionIdentity.js";
 import { createServer } from "../../src/server/server.js";
 
 /**
- * Real P07 element interactions over MCP (opt-in via pnpm test:interactions;
+ * Real element interactions over MCP (opt-in via pnpm test:interactions;
  * never runs under plain pnpm test). Deterministic disposable fixture page
  * served from 127.0.0.1 on an ephemeral port (test infrastructure only; not
  * a product listener). Pre-existing user tabs are recorded first and must
@@ -279,7 +279,7 @@ afterAll(async () => {
   }
 }, 120_000);
 
-describe("real P07 interactions over MCP", () => {
+describe("real interactions over MCP", () => {
   it(
     "click/fill/type/pressKey/getText against a disposable localhost fixture",
     async () => {
@@ -289,7 +289,7 @@ describe("real P07 interactions over MCP", () => {
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
       handle = serveStdio(() => createServer(service), { transport: serverTransport });
       const testClient = new Client(
-        { name: "arc-mcp-p07-test-client", version: "0.0.0" },
+        { name: "arc-mcp-interactions-test-client", version: "0.0.0" },
         { versionNegotiation: { mode: { pin: "2026-07-28" } } },
       );
       client = testClient;
@@ -318,7 +318,7 @@ describe("real P07 interactions over MCP", () => {
       expect(snapshot.nodes.some((node) => node.role === "button" && node.name === "Submit")).toBe(true);
 
       // getText on the heading: semantic text, read-only so refs stay live.
-      // No intervening snapshot here: P06 latest-snapshot-only means any
+      // No intervening snapshot here: latest-snapshot-only means any
       // new capture would invalidate textboxRef before the fill below.
       const headingText = structuredText(await callTool("browser_get_text", { ref: headingRef }), "browser_get_text");
       expect(headingText).toContain("Interaction Fixture");
@@ -348,7 +348,7 @@ describe("real P07 interactions over MCP", () => {
       snapshot = await pollStatusText(openedTab.id, "enter:hello 世界🙂", "enter handler");
 
       // password: fill a sentinel secret; snapshot + getText never expose it.
-      const sentinel = `p07-secret-sentinel-${randomBytes(8).toString("hex")}`;
+      const sentinel = `test-secret-sentinel-${randomBytes(8).toString("hex")}`;
       const { ref: passwordRef2 } = refValueByName(snapshot, "Secret");
       structuredAccepted(await callTool("browser_fill", { ref: passwordRef2, text: sentinel }), "password fill");
       snapshot = structuredSnapshot(await callTool("browser_snapshot", {}));

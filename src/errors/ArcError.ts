@@ -147,7 +147,7 @@ export function cdpNoContext(): ArcError {
 export function browserOperationNotImplemented(operation: string): ArcError {
   return new ArcError(
     "BROWSER_OPERATION_NOT_IMPLEMENTED",
-    `Browser operation '${operation}' is not implemented yet (belongs to a later phase).`,
+    `Browser operation '${operation}' is not implemented by this backend.`,
     { operation },
   );
 }

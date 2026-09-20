@@ -10,7 +10,7 @@ import { CdpBrowserEngine } from "../../src/browser/cdp/CdpBrowserEngine.js";
 import { cdpVersionUrl } from "../../src/browser/cdp/CdpReadiness.js";
 
 /**
- * Real Windows Arc integration (P03). Explicit opt-in via `pnpm test:arc`;
+ * Real Windows Arc integration. Explicit opt-in via `pnpm test:arc`;
  * never runs under plain `pnpm test`.
  *
  * Uses a temporary per-run profile under os.tmpdir() and an ephemeral

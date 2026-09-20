@@ -10,7 +10,7 @@ import { parseSessionDescriptor } from "../src/bridge/session.js";
 import type { Logger } from "../src/utils/logger.js";
 
 /**
- * P07 secret-payload logging boundary (mocked/static, prelive).
+ * Secret-payload logging boundary (mocked/static).
  *
  * The fill/type text travels only inside the bridge payload to the
  * extension. No diagnostic surface may echo it:
@@ -26,7 +26,7 @@ import type { Logger } from "../src/utils/logger.js";
  * sentinel.
  */
 
-const SENTINEL = `p07-secret-sentinel-${"c3".repeat(8)}-log-boundary`;
+const SENTINEL = `secret-sentinel-${"c3".repeat(8)}-log-boundary`;
 
 function collectingLogger(): { logger: Logger; entries: string[] } {
   const entries: string[] = [];
@@ -261,7 +261,7 @@ describe("secret payload logging boundary", () => {
     const { DebuggerSessionManager, createMemorySnapshotSessionStorage } = await import(
       "../extension/src/snapshot.js"
     );
-    const sentinel = `p08-eval-secret-${"9a".repeat(8)}-must-stay-hidden`;
+    const sentinel = `eval-secret-${"9a".repeat(8)}-must-stay-hidden`;
     const commands: Array<{ method: string; params: unknown }> = [];
     const manager = new DebuggerSessionManager(
       {

@@ -11,26 +11,26 @@ import {
 } from "./liveHelpers.js";
 
 /**
- * P10 live soak (opt-in via pnpm test:soak; never runs under plain pnpm
+ * Live soak (opt-in via pnpm test:soak; never runs under plain pnpm
  * test). Repeated bounded representative cycles against one/few disposable
  * 127.0.0.1 fixture tabs: status, list, snapshot, get_text, evaluate,
  * wait, periodic screenshot, console/network get, occasional clear, and
- * periodic owned-tab churn. Defaults satisfy the P10 minimum (>=10 minutes
- * and >=100 successful cycles, whichever takes longer); env overrides allow
+ * periodic owned-tab churn. Defaults are >=10 minutes
+ * and >=100 successful cycles, whichever takes longer; env overrides allow
  * shorter developer runs.
  *
- * P10_SOAK_MIN_SECONDS (default 600), P10_SOAK_MIN_CYCLES (default 100).
+ * SOAK_MIN_SECONDS (default 600), SOAK_MIN_CYCLES (default 100).
  */
 
-const MIN_SECONDS = Math.max(60, Number.parseInt(process.env["P10_SOAK_MIN_SECONDS"] ?? "600", 10) || 600);
-const MIN_CYCLES = Math.max(1, Number.parseInt(process.env["P10_SOAK_MIN_CYCLES"] ?? "100", 10) || 100);
-const SCREENSHOT_EVERY = Math.max(1, Number.parseInt(process.env["P10_SOAK_SCREENSHOT_EVERY"] ?? "10", 10) || 10);
-const CHURN_EVERY = Math.max(5, Number.parseInt(process.env["P10_SOAK_CHURN_EVERY"] ?? "25", 10) || 25);
+const MIN_SECONDS = Math.max(60, Number.parseInt(process.env["SOAK_MIN_SECONDS"] ?? "600", 10) || 600);
+const MIN_CYCLES = Math.max(1, Number.parseInt(process.env["SOAK_MIN_CYCLES"] ?? "100", 10) || 100);
+const SCREENSHOT_EVERY = Math.max(1, Number.parseInt(process.env["SOAK_SCREENSHOT_EVERY"] ?? "10", 10) || 10);
+const CHURN_EVERY = Math.max(5, Number.parseInt(process.env["SOAK_CHURN_EVERY"] ?? "25", 10) || 25);
 
 const FIXTURE_HTML = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>P10 Soak Home</title></head>
+<html lang="en"><head><meta charset="utf-8"><title>Soak Home</title></head>
 <body>
-<h1>P10 Soak Fixture</h1>
+<h1>Soak Fixture</h1>
 <div id="status" role="status">status: ready</div>
 <label>Name <input id="name" type="text" value="soak"></label>
 <button id="submit" type="button">Submit</button>
@@ -51,7 +51,7 @@ afterAll(async () => {
   }
 }, 120_000);
 
-describe("P10 live soak", () => {
+describe("live soak", () => {
   it(
     "sustains bounded representative cycles with cleanup convergence",
     async () => {
@@ -59,7 +59,7 @@ describe("P10 live soak", () => {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(FIXTURE_HTML);
       });
-      ctx = await startLiveSession("arc-mcp-p10-soak-client");
+      ctx = await startLiveSession("arc-mcp-soak-test-client");
       ctx.fixtureServer = server;
       const fixtureUrl = `${base}/`;
 
@@ -116,7 +116,7 @@ describe("P10 live soak", () => {
             throw new Error("post-evaluate snapshot missing heading ref");
           }
           const waited = await callTool(ctx.client, "browser_wait_for", {
-            condition: { type: "text", value: "P10 Soak Fixture" },
+            condition: { type: "text", value: "Soak Fixture" },
             timeoutMs: 15_000,
           });
           if (waited.isError === true) {
@@ -183,7 +183,7 @@ describe("P10 live soak", () => {
         bridgeConnected: (await ctx.engine.status()).connected,
       };
       // eslint-disable-next-line no-console
-      console.log(`[p10-soak] ${JSON.stringify(evidence)}`);
+      console.log(`[soak] ${JSON.stringify(evidence)}`);
       expect(evidence.cycles).toBeGreaterThanOrEqual(MIN_CYCLES);
       expect(evidence.durationSeconds).toBeGreaterThanOrEqual(MIN_SECONDS);
       expect(evidence.failures).toBe(0);

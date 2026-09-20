@@ -151,7 +151,7 @@ async function refs(fixture: Harness): Promise<Record<string, string>> {
   return Object.fromEntries(byName);
 }
 
-describe("P07 reference behavior", () => {
+describe("reference behavior", () => {
   it("rejects stale/malformed/foreign/old-snapshot/old-session refs", async () => {
     const fixture = harness();
     const first = await refs(fixture);
@@ -200,7 +200,7 @@ describe("P07 reference behavior", () => {
   });
 });
 
-describe("P07 click", () => {
+describe("click", () => {
   it("scrolls, reads a valid quad, dispatches moved/pressed/released, invalidates refs", async () => {
     const fixture = harness();
     const live = await refs(fixture);
@@ -256,7 +256,7 @@ describe("P07 click", () => {
   });
 });
 
-describe("P07 fill", () => {
+describe("fill", () => {
   it("replaces normal input text via focus + clear + insertText (Unicode)", async () => {
     const fixture = harness();
     const live = await refs(fixture);
@@ -372,7 +372,7 @@ describe("P07 fill", () => {
   });
 });
 
-describe("P07 type", () => {
+describe("type", () => {
   it("inserts without a clear sequence and supports Unicode", async () => {
     const fixture = harness();
     const live = await refs(fixture);
@@ -412,7 +412,7 @@ describe("P07 type", () => {
   });
 });
 
-describe("P07 pressKey", () => {
+describe("pressKey", () => {
   it("dispatches keyDown/keyUp for accepted keys and invalidates refs", async () => {
     const fixture = harness();
     await refs(fixture);
@@ -435,7 +435,7 @@ describe("P07 pressKey", () => {
   });
 });
 
-describe("P07 getText", () => {
+describe("getText", () => {
   it("returns heading semantic text without invalidating the ref", async () => {
     const fixture = harness();
     const live = await refs(fixture);
@@ -496,9 +496,9 @@ describe("P07 getText", () => {
   });
 });
 
-describe("P07 secret hygiene", () => {
+describe("secret hygiene", () => {
   it("sentinel fill secret never appears in results, snapshots, or errors", async () => {
-    const sentinel = `p07-secret-sentinel-${"9f".repeat(8)}`;
+    const sentinel = `test-secret-sentinel-${"9f".repeat(8)}`;
     const fixture = harness();
     const live = await refs(fixture);
     const password = live["Password"];

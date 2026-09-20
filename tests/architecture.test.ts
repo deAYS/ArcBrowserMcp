@@ -27,10 +27,10 @@ function forbiddenImports(source: string): string[] {
   return hits;
 }
 
-describe("P02 architecture boundaries", () => {
+describe("architecture boundaries", () => {
   it("has only the approved browser-automation dependency (playwright-core)", () => {
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    // P03 approves exactly playwright-core; the full playwright bundle,
+    // Only playwright-core is approved; the full playwright bundle,
     // test runner, browser downloads, and rival frameworks stay out.
     for (const token of ["puppeteer", "selenium", "chrome-remote-interface"]) {
       const hit = Object.keys(deps).find((name) => name.toLowerCase().includes(token));
@@ -116,8 +116,8 @@ describe("P02 architecture boundaries", () => {
   });
 });
 
-describe("P03B bridge boundaries", () => {
-  it("exposes no unauthenticated network listener (AC6)", () => {
+describe("bridge boundaries", () => {
+  it("exposes no unauthenticated network listener", () => {
     const files = [
       "src/bridge/mcpPipeServer.ts",
       "src/bridge/native-host/host.ts",
@@ -166,10 +166,10 @@ describe("P03B bridge boundaries", () => {
     for (const token of ["listtabs", "screenshot", "evaluate"]) {
       expect(rpc, `bridge RPC must not contain ${token}`).not.toContain(token);
     }
-    // snapshot.capture is a P06 semantic RPC; no CDP passthrough.
+    // snapshot.capture is a semantic RPC; no CDP passthrough.
     expect(rpc).not.toContain("snapshot");
     const runtime = stripComments(readSource("src/browser/extension/BridgeRuntime.ts"));
-    // Explicit typed browser RPC surface (P04-P08): these are project-owned
+    // Explicit typed browser RPC surface: these are project-owned
     // bridge method names, never CDP method dispatch.
     for (const method of [
       "snapshot.capture",
@@ -194,7 +194,7 @@ describe("P03B bridge boundaries", () => {
   });
 });
 
-describe("P03C extension engine boundaries", () => {
+describe("extension engine boundaries", () => {
   it("ArcExtensionEngine exposes no browser-library or transport types", () => {
     for (const file of ["src/browser/extension/ArcExtensionEngine.ts", "src/browser/extension/BridgeRuntime.ts"]) {
       const raw = readSource(file);
@@ -242,15 +242,15 @@ describe("P03C extension engine boundaries", () => {
   });
 });
 
-describe("P05 navigation boundaries", () => {
+describe("navigation boundaries", () => {
   it("navigation uses typed RPC and chrome.tabs only, with no new permissions", () => {
     const background = stripComments(readSource("extension/src/background.ts"));
     for (const method of ["navigation.navigate", "navigation.back", "navigation.forward", "navigation.reload"]) {
       expect(background, `background must route ${method}`).toContain(method);
     }
-    // Scope to the tab/navigation routing region: the P03E diagnostics block
+    // Scope to the tab/navigation routing region: the diagnostics block
     // legitimately uses chrome.debugger for its own capability probes.
-    const routingRegion = background.slice(background.indexOf("// P04 tab management"));
+    const routingRegion = background.slice(background.indexOf("// Chrome truth stays"));
     expect(routingRegion).not.toContain("debugger.attach");
     expect(routingRegion).not.toContain("Page.navigate");
     const manifest = JSON.parse(readSource("extension/manifest.json")) as {
@@ -267,9 +267,9 @@ describe("P05 navigation boundaries", () => {
     expect(registrations).toHaveLength(1);
   });
 
-  it("P06+ operations are real implementations in the extension engine", () => {
+  it("snapshot and later operations are real implementations in the extension engine", () => {
     const engine = stripComments(readSource("src/browser/extension/ArcExtensionEngine.ts"));
-    // snapshot + P07 interactions + P08 page tools are all real; the
+    // snapshot + interactions + page tools are all real; the
     // notImplemented helper is gone (CdpBrowserEngine keeps its own stubs).
     for (const operation of ["click", "fill", "type", "pressKey", "getText", "screenshot", "evaluate", "waitFor"]) {
       expect(engine).not.toContain(`notImplemented("${operation}")`);
@@ -277,7 +277,7 @@ describe("P05 navigation boundaries", () => {
     expect(engine).not.toContain("browserOperationNotImplemented");
   });
 
-  it("P07 interaction path uses only the fixed CDP allowlist (Runtime.evaluate is P08-evaluate-scoped)", () => {
+  it("interaction path uses only the fixed CDP allowlist (Runtime.evaluate is evaluate-scoped)", () => {
     const ext = stripComments(readSource("extension/src/snapshot.ts"));
     for (const method of [
       "DOM.scrollIntoViewIfNeeded",
@@ -290,7 +290,7 @@ describe("P05 navigation boundaries", () => {
     ]) {
       expect(ext, `extension interactions must allowlist ${method}`).toContain(method);
     }
-    // Runtime.evaluate is allowlisted ONLY for the explicit P08 evaluate
+    // Runtime.evaluate is allowlisted ONLY for the explicit evaluate
     // path (evaluateElement -> runtime.evaluate bridge method). Prove this
     // structurally: interaction entry points (click/fill/type/pressKey/
     // getText) and the snapshot capture / wait-corpus / screenshot helpers
@@ -362,7 +362,7 @@ describe("P05 navigation boundaries", () => {
     expect(manifest.host_permissions).toEqual([]);
   });
 
-  it("P08 page tools are registered with evaluate/screenshot/wait_for", () => {
+  it("page tools are registered with evaluate/screenshot/wait_for", () => {
     const server = stripComments(readSource("src/server/server.ts"));
     expect(server).toContain("registerInteractionTools");
     expect(server).toContain("registerPageTools");
@@ -394,7 +394,7 @@ describe("P05 navigation boundaries", () => {
     expect(fingerprint).toContain("sha256");
   });
 
-  it("P06 snapshot keeps the allowlisted debugger boundary (P08 evaluate is scoped)", () => {
+  it("snapshot keeps the allowlisted debugger boundary (evaluate is scoped)", () => {
     // No arbitrary CDP surface: MCP/Service/Engine never accept CDP method
     // strings; the extension sends a fixed allowlist only.
     const engine = stripComments(readSource("src/browser/extension/ArcExtensionEngine.ts"));
@@ -419,12 +419,12 @@ describe("P05 navigation boundaries", () => {
     expect(snapshotExt).not.toContain("Runtime.callFunctionOn");
     const background = stripComments(readSource("extension/src/background.ts"));
     expect(background).toContain("snapshot.capture");
-    // Only the P03E diagnostics block may use chrome.debugger outside the
+    // Only the diagnostics block may use chrome.debugger outside the
     // snapshot module; tab/navigation routing never attaches the debugger.
-    const routingRegion = background.slice(background.indexOf("// P04 tab management"));
+    const routingRegion = background.slice(background.indexOf("// Chrome truth stays"));
     const snapshotModuleRegion = routingRegion.slice(routingRegion.indexOf("snapshotManager"));
     expect(snapshotModuleRegion).not.toContain("Page.navigate");
-    // P08 evaluate routing lives in the same single dispatcher but outside
+    // Evaluate routing lives in the same single dispatcher but outside
     // the snapshot capture region: snapshot.capture itself never evaluates.
     const captureRegion = snapshotModuleRegion.slice(0, snapshotModuleRegion.indexOf("interaction.click"));
     expect(captureRegion).not.toContain("Runtime.evaluate");
@@ -432,10 +432,10 @@ describe("P05 navigation boundaries", () => {
     expect(registrations).toHaveLength(1);
   });
 
-  it("P08 keeps the fixed allowlist with no generic surface or Page.enable", () => {
+  it("keeps the fixed allowlist with no generic surface or Page.enable", () => {
     const ext = stripComments(readSource("extension/src/snapshot.ts"));
-    // P09 adds Runtime.enable/Network.enable as narrow observability
-    // capabilities only (asserted in the dedicated P09 test below). Every
+    // Observability adds Runtime.enable/Network.enable as narrow observability
+    // capabilities only (asserted in the dedicated observability test below). Every
     // other sensitive/body/traversal/storage surface stays absent.
     for (const token of ["Runtime.callFunctionOn", "Runtime.getProperties", "DOM.getOuterHTML", "Page.enable", "Target.", "Storage.", "Browser.", "Network.getResponseBody", "Network.getRequestPostData", "Network.set", "ExtraInfo"]) {
       expect(ext, `extension must not contain ${token}`).not.toContain(token);
@@ -448,7 +448,7 @@ describe("P05 navigation boundaries", () => {
     }
   });
 
-  it("P09 observability keeps the narrow capability boundary (no bodies, no generic events)", () => {
+  it("observability keeps the narrow capability boundary (no bodies, no generic events)", () => {
     const ext = stripComments(readSource("extension/src/snapshot.ts"));
     // The ONLY new production CDP commands are the two enables.
     for (const method of ["Runtime.enable", "Network.enable"]) {
@@ -485,7 +485,7 @@ describe("P05 navigation boundaries", () => {
         expect(code, `${file} must not contain ${token}`).not.toContain(token);
       }
     }
-    // Engine never touches CDP method strings; the tools register only P09 names.
+    // Engine never touches CDP method strings; the tools register only observability names.
     const engine = stripComments(readSource("src/browser/extension/ArcExtensionEngine.ts"));
     for (const token of ["Runtime.enable", "Network.enable", "sendCommand", "Accessibility", "DOM.describeNode"]) {
       expect(engine, `ArcExtensionEngine must not contain ${token}`).not.toContain(token);
@@ -507,7 +507,7 @@ describe("P05 navigation boundaries", () => {
       expect(observabilityTool).toContain(tool);
     }
     expect(observabilityTool).not.toContain("browser_console_extra");
-    // Manifest unchanged; P10 tools absent.
+    // Manifest unchanged; no extra tools.
     const manifest = JSON.parse(readSource("extension/manifest.json")) as {
       permissions?: unknown;
       host_permissions?: unknown;
@@ -527,7 +527,7 @@ describe("P05 navigation boundaries", () => {
       expect(code).not.toContain("browser_network_clear");
       expect(code).not.toContain("browser_observe");
     }
-    // Fingerprint includes every extension-consumed shared P09 source.
+    // Fingerprint includes every extension-consumed shared observability source.
     const fingerprint = stripComments(readSource("extension/fingerprint.mjs"));
     for (const shared of [
       "src/observability/observabilityPolicy",

@@ -8,7 +8,7 @@ import { computeExtensionBuildId, listExtensionConsumedSharedSources, listExtens
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-describe("P09 fingerprint covers extension-consumed shared sources", () => {
+describe("fingerprint covers extension-consumed shared sources", () => {
   it("lists every shared observability/redaction/policy source", () => {
     const inputs = listExtensionFingerprintInputs(REPO_ROOT);
     for (const shared of [

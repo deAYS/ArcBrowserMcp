@@ -12,7 +12,7 @@ import * as path from "node:path";
 import { parseSessionDescriptor } from "../src/bridge/session.js";
 
 /**
- * P08 large-response RPC integration regression (mocked/static, prelive).
+ * Large-response RPC integration regression (mocked/static).
  *
  * Proves the actual relay path — not just the framing codec — carries an
  * extension-originated >256 KiB response with end-to-end RPC correlation:
@@ -22,7 +22,7 @@ import { parseSessionDescriptor } from "../src/bridge/session.js";
  *
  * and that the small request direction still rejects >256 KiB. A 2 MiB
  * response is representative; the 12 MiB/16 MiB codec boundaries stay in
- * the P08T framing suite (no need to re-allocate them here).
+ * the directional framing suite (no need to re-allocate them here).
  */
 
 async function waitFor(condition: () => boolean, label: string, timeoutMs = 10_000): Promise<void> {
@@ -38,13 +38,13 @@ async function waitFor(condition: () => boolean, label: string, timeoutMs = 10_0
   }
 }
 
-describe("P08 large-response RPC integration", () => {
+describe("large-response RPC integration", () => {
   it("correlates a 2 MiB extension-originated response through the pipe server", async () => {
-    const dir = await mkdtemp(path.join(os.tmpdir(), "arc-mcp-p08-rpc-"));
+    const dir = await mkdtemp(path.join(os.tmpdir(), "arc-mcp-large-rpc-"));
     let server: McpPipeServer | null = null;
     let socket: net.Socket | null = null;
     try {
-      const pipeName = `\\\\.\\pipe\\arc-mcp-p08-rpc-${String(process.pid)}`;
+      const pipeName = `\\\\.\\pipe\\arc-mcp-large-rpc-${String(process.pid)}`;
       server = new McpPipeServer({ pipeName, sessionDir: dir, applyPipeAcl: () => Promise.resolve() });
       await server.start();
       const session = parseSessionDescriptor(await readFile(path.join(dir, "bridge-session.json"), "utf-8"));

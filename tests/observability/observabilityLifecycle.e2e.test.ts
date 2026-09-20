@@ -14,7 +14,7 @@ import { loadExtensionIdentity } from "../../src/bridge/extensionIdentity.js";
 import { createServer } from "../../src/server/server.js";
 
 /**
- * Real P09 console/network observability over MCP (opt-in via
+ * Real console/network observability over MCP (opt-in via
  * pnpm test:observability; never runs under plain pnpm test).
  * Deterministic disposable fixture served ONLY from 127.0.0.1 on an
  * ephemeral port (test infrastructure only; not a product listener).
@@ -22,8 +22,7 @@ import { createServer } from "../../src/server/server.js";
  * unchanged URLs/pinned state; the originally active tab is restored.
  * Existing user pages are never observed, evaluated, or inspected.
  *
- * DO NOT RUN against a stale (pre-P09) extension worker: the prelive gate
- * requires the live buildId to match the reviewer-approved P09 build
+ * DO NOT RUN against a stale extension worker: rebuild the extension
  * before this suite runs.
  */
 
@@ -101,21 +100,21 @@ interface NetworkPayload {
   }>;
 }
 
-const REQUEST_BODY_SENTINEL = "p09-live-request-body-sentinel-must-never-appear";
-const RESPONSE_BODY_SENTINEL = "p09-live-response-body-sentinel-must-never-appear";
-const URL_SECRET_PARAM = "p09_live_url_secret_must_be_redacted";
+const REQUEST_BODY_SENTINEL = "live-request-body-sentinel-must-never-appear";
+const RESPONSE_BODY_SENTINEL = "live-response-body-sentinel-must-never-appear";
+const URL_SECRET_PARAM = "live_url_secret_must_be_redacted";
 
 const FIXTURE_HTML = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>P09 Fixture Home</title></head>
+<html lang="en"><head><meta charset="utf-8"><title>Fixture Home</title></head>
 <body>
-<h1>P09 Fixture</h1>
+<h1>Fixture</h1>
 <div id="status" role="status">status: ready</div>
 <button id="trigger" type="button">Trigger observability</button>
 <script>
 document.getElementById("trigger").addEventListener("click", async () => {
-  console.log("p09-fixture-marker-log");
-  console.warn("p09-fixture-marker-warn");
-  console.error("p09-fixture-marker-error");
+  console.log("fixture-marker-log");
+  console.warn("fixture-marker-warn");
+  console.error("fixture-marker-error");
   try {
     const response = await fetch("./api/data?access_token=${URL_SECRET_PARAM}&page=2", {
       method: "POST",
@@ -161,7 +160,7 @@ async function startFixture(): Promise<string> {
         res.writeHead(200, {
           "content-type": "application/json",
           "X-Test-Safe-Response": "safe-response-value",
-          "X-Api-Key": "p09-live-response-key-must-be-redacted",
+          "X-Api-Key": "live-response-key-must-be-redacted",
         });
         res.end(body);
       });
@@ -336,7 +335,7 @@ afterAll(async () => {
   }
 }, 120_000);
 
-describe("real P09 observability over MCP", () => {
+describe("real observability over MCP", () => {
   it(
     "browser_console/browser_network against a disposable localhost fixture",
     async () => {
@@ -349,7 +348,7 @@ describe("real P09 observability over MCP", () => {
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
       handle = serveStdio(() => createServer(service), { transport: serverTransport });
       const testClient = new Client(
-        { name: "arc-mcp-p09-test-client", version: "0.0.0" },
+        { name: "arc-mcp-observability-test-client", version: "0.0.0" },
         { versionNegotiation: { mode: { pin: "2026-07-28" } } },
       );
       client = testClient;
@@ -416,7 +415,7 @@ describe("real P09 observability over MCP", () => {
         const deadline = Date.now() + CONSOLE_POLL_TIMEOUT_MS;
         for (;;) {
           const current = structuredConsole(await callTool("browser_console", { action: "get" }), "poll console");
-          if (current.entries.some((entry) => entry.text.includes("p09-fixture-marker-log"))) {
+          if (current.entries.some((entry) => entry.text.includes("fixture-marker-log"))) {
             consoleResult = current;
             break;
           }
@@ -428,13 +427,13 @@ describe("real P09 observability over MCP", () => {
       }
       expect(consoleResult).not.toBeNull();
       // Expected marker + level + timestamp + source, no raw CDP ids.
-      const marker = consoleResult?.entries.find((entry) => entry.text.includes("p09-fixture-marker-log"));
+      const marker = consoleResult?.entries.find((entry) => entry.text.includes("fixture-marker-log"));
       expect(marker?.level).toBe("log");
       expect(typeof marker?.timestamp).toBe("string");
       expect((marker?.timestamp ?? "").length).toBeGreaterThan(0);
-      const warnEntry = consoleResult?.entries.find((entry) => entry.text.includes("p09-fixture-marker-warn"));
+      const warnEntry = consoleResult?.entries.find((entry) => entry.text.includes("fixture-marker-warn"));
       expect(warnEntry?.level).toBe("warning");
-      const errorEntry = consoleResult?.entries.find((entry) => entry.text.includes("p09-fixture-marker-error"));
+      const errorEntry = consoleResult?.entries.find((entry) => entry.text.includes("fixture-marker-error"));
       expect(errorEntry?.level).toBe("error");
       expect(JSON.stringify(consoleResult)).not.toContain("objectId");
       expect(JSON.stringify(consoleResult)).not.toContain("executionContextId");
@@ -496,7 +495,7 @@ describe("real P09 observability over MCP", () => {
       expect(networkClear.isError).not.toBe(true);
       expect((networkClear.structuredContent as { cleared?: boolean }).cleared).toBe(true);
       const afterConsoleClear = structuredConsole(await callTool("browser_console", { action: "get" }), "post-clear console");
-      expect(afterConsoleClear.entries.some((entry) => entry.text.includes("p09-fixture-marker-log"))).toBe(false);
+      expect(afterConsoleClear.entries.some((entry) => entry.text.includes("fixture-marker-log"))).toBe(false);
       const afterNetworkClear = structuredNetwork(await callTool("browser_network", { action: "get" }), "post-clear network");
       expect(afterNetworkClear.entries.some((entry) => entry.url.includes("/api/data"))).toBe(false);
       expect(afterConsoleClear.monitoring).toBe(true);
@@ -515,7 +514,7 @@ describe("real P09 observability over MCP", () => {
       expect(refNetworkClear.isError).not.toBe(true);
       const refText = await callTool("browser_get_text", { ref: freshHeading });
       expect(refText.isError, "observability must preserve live refs").not.toBe(true);
-      expect(JSON.stringify(refText.structuredContent)).toContain("P09 Fixture");
+      expect(JSON.stringify(refText.structuredContent)).toContain("Fixture");
 
       // Privileged negatives on a disposable test-owned new-tab page.
       const privilegedOpen = await callTool("browser_open_tab", {});
