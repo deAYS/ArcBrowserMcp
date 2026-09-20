@@ -2,6 +2,7 @@
   "name": "arc-mcp",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "description": "MCP server for inspecting and controlling web content in Arc Browser on Windows.",
   "repository": {
     "type": "git",
@@ -19,6 +20,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "build:extension": "tsc -p extension/tsconfig.json --noEmit && node extension/build.mjs",
+    "pretest": "pnpm build:extension",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:arc": "vitest run --config vitest.arc.config.ts",

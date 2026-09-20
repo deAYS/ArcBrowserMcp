@@ -207,9 +207,18 @@ which permits local connection attempts from Everyone. Do not treat the pipe as 
 
 ## Development
 
+`pnpm test` builds the extension first (via a `pretest` step), so a clean
+checkout only needs:
+
+```powershell
+pnpm install
+pnpm test
+```
+
+Individual steps remain available:
+
 ```powershell
 pnpm typecheck
-pnpm test
 pnpm build
 pnpm build:extension
 ```
@@ -270,3 +279,7 @@ Runtime state lives under:
 ```text
 %LOCALAPPDATA%\arc-mcp\
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
