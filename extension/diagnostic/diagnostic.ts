@@ -72,6 +72,21 @@ function statusClass(value: string): string {
   return value === "pass" ? "pass" : value === "fail" ? "fail" : "";
 }
 
+/** Checks in the suite; drives the hero counters and progress bar. */
+const TOTAL_CHECKS = 16;
+
+function updateHero(pass: number, fail: number, other: number): void {
+  el("count-pass").textContent = String(pass);
+  el("count-fail").textContent = String(fail);
+  el("count-other").textContent = String(other);
+  const settled = Math.min(pass + fail, TOTAL_CHECKS);
+  const fill = document.getElementById("progress-fill");
+  if (fill !== null) {
+    fill.style.width = `${String(Math.round((settled / TOTAL_CHECKS) * 100))}%`;
+  }
+  el("summary").textContent = `${String(settled)} of ${String(TOTAL_CHECKS)} checks settled`;
+}
+
 function renderBridgeStatus(view: BridgeStatusView): void {
   const container = el("bridge-status");
   container.textContent = "";
@@ -122,7 +137,7 @@ function render(report: RenderableReport): void {
   verdictEl.className = verdict === "SUPPORTED" ? "verdict-supported" : verdict === "BLOCKED" ? "verdict-blocked" : "verdict-unknown";
 
   const { pass, fail, other } = renderMatrix(report.capabilities ?? {});
-  el("summary").textContent = `${pass} pass · ${fail} fail · ${other} other`;
+  updateHero(pass, fail, other);
 
   const envBody = tbodyOf("env");
   envBody.textContent = "";
@@ -248,7 +263,7 @@ async function pollProgress(): Promise<string | null> {
       const { pass, fail, other } = renderMatrix(
         progress["capabilities"] as ProgressView["capabilities"],
       );
-      el("summary").textContent = `${pass} pass · ${fail} fail · ${other} other (live)`;
+      updateHero(pass, fail, other);
     }
     const current = progress["currentCheck"];
     return typeof current === "string" ? current : null;
