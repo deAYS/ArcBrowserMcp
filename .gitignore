@@ -1,6 +1,7 @@
 node_modules/
 dist/
 extension/dist/
+release/
 coverage/
 data/
 

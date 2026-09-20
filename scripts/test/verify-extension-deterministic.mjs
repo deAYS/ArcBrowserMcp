@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 function runBuild() {
   execFileSync(process.execPath, ["extension/build.mjs"], { cwd: repoRoot, stdio: "inherit" });
@@ -30,7 +30,7 @@ function runBuild() {
 }
 
 const first = runBuild();
-const { computeExtensionBuildId } = await import("../extension/fingerprint.mjs");
+const { computeExtensionBuildId } = await import("../../extension/fingerprint.mjs");
 const buildIdFirst = computeExtensionBuildId(repoRoot);
 const second = runBuild();
 const buildIdSecond = computeExtensionBuildId(repoRoot);

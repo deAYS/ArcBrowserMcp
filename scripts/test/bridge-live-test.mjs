@@ -20,7 +20,7 @@ import { fileURLToPath } from "node:url";
 import * as path from "node:path";
 
 const DIST = path.dirname(fileURLToPath(import.meta.url));
-const REPO_DIST = path.resolve(DIST, "..", "dist");
+const REPO_DIST = path.resolve(DIST, "..", "..", "dist");
 
 const { McpPipeServer } = await import(`file://${REPO_DIST}/bridge/mcpPipeServer.js`);
 const { bridgePipeName } = await import(`file://${REPO_DIST}/bridge/constants.js`);

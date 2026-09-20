@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BrowserMcp — Arc MCP Bridge</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 880px; margin: 0 auto; padding: 2rem 1rem 4rem; line-height: 1.55; }
+  header p { margin-top: 0; opacity: .8; }
+  .tabs { display: flex; gap: .25rem; border-bottom: 2px solid #8884; margin: 1.5rem 0; }
+  .tabs button { font: inherit; padding: .5rem 1rem; border: 0; background: none; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+  .tabs button[aria-selected="true"] { border-bottom-color: #4f8cff; font-weight: 600; }
+  .card { border: 1px solid #8884; border-radius: .75rem; padding: 1.25rem; margin: 1rem 0; }
+  .btn { display: inline-block; padding: .6rem 1.25rem; border-radius: .5rem; background: #4f8cff; color: #fff; text-decoration: none; font-weight: 600; margin-right: .5rem; }
+  .btn.secondary { background: transparent; border: 1px solid #8888; color: inherit; font-weight: 400; }
+  pre { background: #8882; padding: 1rem; border-radius: .5rem; overflow-x: auto; }
+  code { font-size: .9em; }
+  .meta { opacity: .75; font-size: .9em; }
+  #release-error a, footer a { color: #4f8cff; }
+</style>
+</head>
+<body>
+<header>
+  <h1>BrowserMcp</h1>
+  <p>Local MCP server for driving Arc Browser on Windows — via the Arc MCP Bridge extension.</p>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Site sections">
+  <button role="tab" id="tabbtn-download" aria-controls="tab-download" aria-selected="true">Download</button>
+  <button role="tab" id="tabbtn-install" aria-controls="tab-install" aria-selected="false">Install Guide</button>
+  <button role="tab" id="tabbtn-contribute" aria-controls="tab-contribute" aria-selected="false">Contribute</button>
+</nav>
+
+<main>
+  <section id="tab-download" role="tabpanel" aria-labelledby="tabbtn-download">
+    <h2>Download</h2>
+    <p class="meta">Requires Windows, Arc Browser, and Node.js ≥ 22. Expected extension ID after install:</p>
+    <p><code>hgipaclbbilhkpdbobokbgjfeafcbkpc</code></p>
+    <div class="card" id="release-loading"><p>Loading the latest release…</p></div>
+    <div class="card" id="release-card" hidden>
+      <h3 id="release-name"></h3>
+      <p class="meta" id="release-meta"></p>
+      <p id="release-notes-link"></p>
+      <p id="release-assets"></p>
+      <p class="meta">Verify after download:</p>
+      <pre><code id="release-sha"></code></pre>
+    </div>
+    <div class="card" id="release-error" hidden>
+      <p>No published release found yet. See <a id="releases-link" href="">all releases</a>,
+        or build the zip yourself with <code>pnpm extension:pack</code>.</p>
+    </div>
+    <h3>Prefer to build it yourself?</h3>
+    <pre><code>git clone https://github.com/deAYS/BrowserMcp.git
+cd BrowserMcp
+pnpm install
+pnpm extension:pack   # drops release/*.zip + .sha256</code></pre>
+  </section>
+
+  <section id="tab-install" role="tabpanel" aria-labelledby="tabbtn-install" hidden>
+    <h2>Install Guide</h2>
+    <h3>1. Requirements</h3>
+    <ul>
+      <li>Windows with Arc Browser installed</li>
+      <li>Node.js ≥ 22, pnpm 10, Git</li>
+    </ul>
+    <h3>2. Build</h3>
+    <pre><code>git clone https://github.com/deAYS/BrowserMcp.git
+cd BrowserMcp
+pnpm install
+pnpm build
+pnpm build:extension</code></pre>
+    <h3>3. Load the extension (unpackaged dev install)</h3>
+    <ol>
+      <li>Open <code>arc://extensions</code> in Arc.</li>
+      <li>Enable Developer mode.</li>
+      <li>Load unpacked, selecting <code>extension/dist/</code> from this checkout.</li>
+    </ol>
+    <p>Or run <code>pnpm dev:install</code>, which builds, registers the native host, and prints these steps.</p>
+    <h3>4. Connect the bridge</h3>
+    <pre><code>pnpm bridge:install
+pnpm bridge:check
+pnpm bridge:ping</code></pre>
+    <p><code>bridge:install</code> writes machine-specific Native Messaging files to
+      <code>%LOCALAPPDATA%\arc-mcp\native-host\</code> and registers
+      <code>HKCU\Software\Google\Chrome\NativeMessagingHosts\com.arc_mcp.bridge</code>.
+      Those files are local state — never commit them.</p>
+    <h3>5. Run</h3>
+    <pre><code>pnpm start   # serve MCP over stdio
+pnpm dev     # build once, then run with --watch</code></pre>
+    <h3>Uninstall</h3>
+    <pre><code>pnpm bridge:uninstall</code></pre>
+    <p>Then remove the extension from <code>arc://extensions</code>.</p>
+  </section>
+
+  <section id="tab-contribute" role="tabpanel" aria-labelledby="tabbtn-contribute" hidden>
+    <h2>Contribute</h2>
+    <h3>Workflow</h3>
+    <pre><code>git clone https://github.com/deAYS/BrowserMcp.git
+cd BrowserMcp
+pnpm install
+pnpm test</code></pre>
+    <p><code>pnpm test</code> builds the extension first via <code>pretest</code>. Individual steps:</p>
+    <pre><code>pnpm typecheck
+pnpm build
+pnpm build:extension</code></pre>
+    <p>Focused suites: <code>pnpm test:tabs test:navigation test:snapshot test:interactions test:page-tools test:observability test:extension-engine test:reliability</code>.
+      Bridge checks: <code>pnpm bridge:check bridge:ping bridge:live-test extension:build-id extension:id extension:verify-deterministic</code>.
+      <code>test:reconnect</code>, <code>test:release</code>, and <code>test:soak</code> need a real Arc environment with the bridge loaded.</p>
+    <h3>Pull requests</h3>
+    <ul>
+      <li>Fork, branch, keep PRs small and focused; describe what you verified.</li>
+      <li>Add or update tests for behavior changes; keep the deterministic extension build green.</li>
+    </ul>
+    <h3>Never commit</h3>
+    <ul>
+      <li>Private keys or any <code>*.pem/*.key/*.pfx/*.p12</code> material (enforced by <code>tests/release/toolsetSecurity.test.ts</code>).</li>
+      <li>Generated host files (<code>%LOCALAPPDATA%\arc-mcp\</code>), session files, or <code>release/</code> zips.</li>
+      <li>Secrets, tokens, or the pipe session nonce in logs and tests.</li>
+    </ul>
+    <p>License: MIT — see <a href="https://github.com/deAYS/BrowserMcp/blob/main/LICENSE">LICENSE</a>.
+      Report issues at <a href="https://github.com/deAYS/BrowserMcp/issues">GitHub Issues</a>.</p>
+  </section>
+</main>
+
+<footer>
+  <p class="meta">BrowserMcp — MIT. Sources at <a href="https://github.com/deAYS/BrowserMcp">deAYS/BrowserMcp</a>.</p>
+</footer>
+
+<script>
+"use strict";
+const OWNER = "deAYS";
+const REPO = "BrowserMcp";
+const API_LATEST = `https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`;
+const RELEASES_PAGE = `https://github.com/${OWNER}/${REPO}/releases`;
+
+// Tabs: one handler, no framework.
+const buttons = [...document.querySelectorAll('[role="tab"]')];
+function selectTab(btn) {
+  for (const b of buttons) {
+    const active = b === btn;
+    b.setAttribute("aria-selected", String(active));
+    document.getElementById(b.getAttribute("aria-controls")).hidden = !active;
+  }
+}
+for (const b of buttons) b.addEventListener("click", () => selectTab(b));
+
+// Latest release, served dynamically from the GitHub Releases API.
+async function loadLatestRelease() {
+  const loading = document.getElementById("release-loading");
+  const card = document.getElementById("release-card");
+  const error = document.getElementById("release-error");
+  document.getElementById("releases-link").href = RELEASES_PAGE;
+  let release;
+  try {
+    const res = await fetch(API_LATEST);
+    if (!res.ok) throw new Error(`releases API: ${res.status}`);
+    release = await res.json();
+  } catch {
+    loading.hidden = true;
+    error.hidden = false;
+    return;
+  }
+  const zip = (release.assets || []).find((a) => a.name.endsWith(".zip"));
+  const shaSidecar = (release.assets || []).find((a) => a.name.endsWith(".sha256"));
+  document.getElementById("release-name").textContent = release.name || release.tag_name;
+  document.getElementById("release-meta").textContent =
+    `${release.tag_name} · published ${new Date(release.published_at).toLocaleDateString()}`;
+  const notes = document.getElementById("release-notes-link");
+  const notesLink = document.createElement("a");
+  notesLink.href = release.html_url;
+  notesLink.textContent = "Release notes";
+  notes.replaceChildren(notesLink);
+  const assets = document.getElementById("release-assets");
+  assets.replaceChildren();
+  if (zip) {
+    const dl = document.createElement("a");
+    dl.className = "btn";
+    dl.href = zip.browser_download_url;
+    dl.textContent = `Download ${zip.name}`;
+    assets.appendChild(dl);
+  }
+  const all = document.createElement("a");
+  all.className = "btn secondary";
+  all.href = RELEASES_PAGE;
+  all.textContent = "All releases";
+  assets.appendChild(all);
+  let shaText = "(no .sha256 sidecar attached to this release)";
+  if (shaSidecar) {
+    try {
+      shaText = (await (await fetch(shaSidecar.browser_download_url)).text()).trim();
+    } catch { shaText = "(could not load .sha256 sidecar)"; }
+  }
+  document.getElementById("release-sha").textContent =
+    `# from ${shaSidecar ? shaSidecar.name : "release"}\n${shaText}`;
+  loading.hidden = true;
+  card.hidden = false;
+}
+loadLatestRelease();
+</script>
+</body>
+</html>

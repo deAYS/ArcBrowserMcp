@@ -36,15 +36,17 @@
     "test:soak": "vitest run --config vitest.soak.config.ts",
     "test:reconnect": "vitest run --config vitest.reconnect.config.ts",
     "extension:build-id": "node -e \"import('./extension/fingerprint.mjs').then(m=>console.log(m.computeExtensionBuildId(process.cwd())))\"",
-    "extension:verify-deterministic": "node scripts/verify-extension-deterministic.mjs",
+    "extension:verify-deterministic": "node scripts/test/verify-extension-deterministic.mjs",
     "extension:id": "pnpm build && node dist/bridge/cli.js extension-id",
+    "extension:pack": "node scripts/pack-extension.mjs",
     "bridge:install": "pnpm build && node dist/bridge/cli.js install",
     "bridge:uninstall": "node dist/bridge/cli.js uninstall",
     "bridge:check": "node dist/bridge/cli.js check",
     "bridge:ping": "node dist/bridge/cli.js bridge-ping",
-    "bridge:live-test": "node scripts/bridge-live-test.mjs",
+    "bridge:live-test": "node scripts/test/bridge-live-test.mjs",
     "start": "node dist/index.js",
-    "dev": "tsc -p tsconfig.build.json && node --watch dist/index.js"
+    "dev": "tsc -p tsconfig.build.json && node --watch dist/index.js",
+    "dev:install": "node scripts/install-dev.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.0.0",
