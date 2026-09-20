@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BrowserMcp — Arc MCP Bridge</title>
+<title>ArcBrowserMcp — Arc MCP Bridge</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 880px; margin: 0 auto; padding: 2rem 1rem 4rem; line-height: 1.55; }
@@ -22,7 +22,7 @@
 </head>
 <body>
 <header>
-  <h1>BrowserMcp</h1>
+  <h1>ArcBrowserMcp</h1>
   <p>Local MCP server for driving Arc Browser on Windows — via the Arc MCP Bridge extension.</p>
 </header>
 
@@ -51,8 +51,8 @@
         or build the zip yourself with <code>pnpm extension:pack</code>.</p>
     </div>
     <h3>Prefer to build it yourself?</h3>
-    <pre><code>git clone https://github.com/deAYS/BrowserMcp.git
-cd BrowserMcp
+    <pre><code>git clone https://github.com/deAYS/ArcBrowserMcp.git
+cd ArcBrowserMcp
 pnpm install
 pnpm extension:pack   # drops release/*.zip + .sha256</code></pre>
   </section>
@@ -65,8 +65,8 @@ pnpm extension:pack   # drops release/*.zip + .sha256</code></pre>
       <li>Node.js ≥ 22, pnpm 10, Git</li>
     </ul>
     <h3>2. Build</h3>
-    <pre><code>git clone https://github.com/deAYS/BrowserMcp.git
-cd BrowserMcp
+    <pre><code>git clone https://github.com/deAYS/ArcBrowserMcp.git
+cd ArcBrowserMcp
 pnpm install
 pnpm build
 pnpm build:extension</code></pre>
@@ -96,8 +96,8 @@ pnpm dev     # build once, then run with --watch</code></pre>
   <section id="tab-contribute" role="tabpanel" aria-labelledby="tabbtn-contribute" hidden>
     <h2>Contribute</h2>
     <h3>Workflow</h3>
-    <pre><code>git clone https://github.com/deAYS/BrowserMcp.git
-cd BrowserMcp
+    <pre><code>git clone https://github.com/deAYS/ArcBrowserMcp.git
+cd ArcBrowserMcp
 pnpm install
 pnpm test</code></pre>
     <p><code>pnpm test</code> builds the extension first via <code>pretest</code>. Individual steps:</p>
@@ -118,19 +118,19 @@ pnpm build:extension</code></pre>
       <li>Generated host files (<code>%LOCALAPPDATA%\arc-mcp\</code>), session files, or <code>release/</code> zips.</li>
       <li>Secrets, tokens, or the pipe session nonce in logs and tests.</li>
     </ul>
-    <p>License: MIT — see <a href="https://github.com/deAYS/BrowserMcp/blob/main/LICENSE">LICENSE</a>.
-      Report issues at <a href="https://github.com/deAYS/BrowserMcp/issues">GitHub Issues</a>.</p>
+    <p>License: MIT — see <a href="https://github.com/deAYS/ArcBrowserMcp/blob/main/LICENSE">LICENSE</a>.
+      Report issues at <a href="https://github.com/deAYS/ArcBrowserMcp/issues">GitHub Issues</a>.</p>
   </section>
 </main>
 
 <footer>
-  <p class="meta">BrowserMcp — MIT. Sources at <a href="https://github.com/deAYS/BrowserMcp">deAYS/BrowserMcp</a>.</p>
+  <p class="meta">ArcBrowserMcp — MIT. Sources at <a href="https://github.com/deAYS/ArcBrowserMcp">deAYS/ArcBrowserMcp</a>.</p>
 </footer>
 
 <script>
 "use strict";
 const OWNER = "deAYS";
-const REPO = "BrowserMcp";
+const REPO = "ArcBrowserMcp";
 const API_LATEST = `https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`;
 const RELEASES_PAGE = `https://github.com/${OWNER}/${REPO}/releases`;
 
