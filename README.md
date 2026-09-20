@@ -1,4 +1,4 @@
-# BrowserMcp
+# ArcBrowserMcp
 
 Local MCP server for driving Arc Browser on Windows. Clients talk to it over stdio; it relays browser operations through an authenticated Windows named pipe to a Native Messaging host, which forwards them to the Arc MCP Bridge extension. The extension runs them with `chrome.tabs` and `chrome.debugger` against the running Arc instance.
 
@@ -47,18 +47,17 @@ Extension permissions are exactly `debugger, tabs, storage, nativeMessaging, ala
 ## Setup
 
 ```powershell
-git clone https://github.com/deAYS/BrowserMcp.git
-cd BrowserMcp
+git clone https://github.com/deAYS/ArcBrowserMcp.git
+cd ArcBrowserMcp
 pnpm install
 pnpm build
 pnpm build:extension
 ```
 
-Load `extension/dist/` as an unpacked extension:
-
-1. Open `arc://extensions` in Arc.
-2. Enable Developer mode.
-3. Load unpacked, selecting `extension/dist/` from this checkout.
+1. Load the built extension in Arc (`extension/dist/` from this checkout):
+   1. Open `arc://extensions` in Arc.
+   2. Enable Developer mode.
+   3. Load unpacked, selecting the `extension/dist/` folder (for example `<absolute-path-to-repo>\extension\dist`).
 
 Expected extension ID:
 
@@ -66,7 +65,7 @@ Expected extension ID:
 hgipaclbbilhkpdbobokbgjfeafcbkpc
 ```
 
-It is derived from the public key in `extension/identity.json` via the Chromium algorithm and must match after every rebuild. Then:
+It is derived from the public key in `extension/identity.json` via the Chromium algorithm and must match after every rebuild. Then install and verify the Native Messaging bridge:
 
 ```powershell
 pnpm bridge:install
@@ -76,19 +75,23 @@ pnpm bridge:ping
 
 `bridge:install` writes machine-specific Native Messaging files to `%LOCALAPPDATA%\arc-mcp\native-host\` and registers `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.arc_mcp.bridge`. Those files are local state, do not commit them.
 
+Finally, configure/start the MCP client to launch `node <absolute-path-to-repo>/dist/index.js` over stdio (see Running).
+
 ## Running
 
+Start the MCP server over stdio:
+
 ```powershell
-pnpm build    # compile the server to dist/
-pnpm start    # serve MCP over stdio
-pnpm dev      # build once, then run with --watch
+pnpm start    # runs node dist/index.js; MCP traffic goes over stdout, diagnostics go to stderr
 ```
 
-MCP traffic goes over stdout; diagnostics go to stderr. Equivalent direct launch:
+Equivalent direct launch (use the checkout's absolute path):
 
 ```text
-node <repository>/dist/index.js
+node <absolute-path-to-repo>/dist/index.js
 ```
+
+Point any stdio-capable MCP client at this command, for example with command `node` and argument `<absolute-path-to-repo>/dist/index.js`. Verify with `pnpm build` first so `dist/` is current.
 
 ## Tools
 
