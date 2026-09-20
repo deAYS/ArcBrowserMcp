@@ -1,0 +1,60 @@
+{
+  "name": "arc-mcp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MCP server for inspecting and controlling web content in Arc Browser on Windows.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/deAYS/BrowserMcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/deAYS/BrowserMcp/issues"
+  },
+  "homepage": "https://github.com/deAYS/BrowserMcp#readme",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.18.1",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:extension": "tsc -p extension/tsconfig.json --noEmit && node extension/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:arc": "vitest run --config vitest.arc.config.ts",
+    "test:extension-engine": "vitest run --config vitest.extension-engine.config.ts",
+    "test:tabs": "vitest run --config vitest.tabs.config.ts",
+    "test:navigation": "vitest run --config vitest.navigation.config.ts",
+    "test:snapshot": "vitest run --config vitest.snapshot.config.ts",
+    "test:interactions": "vitest run --config vitest.interactions.config.ts",
+    "test:page-tools": "vitest run --config vitest.page-tools.config.ts",
+    "test:observability": "vitest run --config vitest.observability.config.ts",
+    "test:reliability": "vitest run --config vitest.reliability.config.ts",
+    "test:release": "vitest run --config vitest.release.config.ts",
+    "test:soak": "vitest run --config vitest.soak.config.ts",
+    "test:reconnect": "vitest run --config vitest.reconnect.config.ts",
+    "extension:build-id": "node -e \"import('./extension/fingerprint.mjs').then(m=>console.log(m.computeExtensionBuildId(process.cwd())))\"",
+    "extension:verify-deterministic": "node scripts/verify-extension-deterministic.mjs",
+    "extension:id": "pnpm build && node dist/bridge/cli.js extension-id",
+    "bridge:install": "pnpm build && node dist/bridge/cli.js install",
+    "bridge:uninstall": "node dist/bridge/cli.js uninstall",
+    "bridge:check": "node dist/bridge/cli.js check",
+    "bridge:ping": "node dist/bridge/cli.js bridge-ping",
+    "bridge:live-test": "node scripts/bridge-live-test.mjs",
+    "start": "node dist/index.js",
+    "dev": "tsc -p tsconfig.build.json && node --watch dist/index.js"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@types/chrome": "0.2.9",
+    "@types/node": "^22.10.2",
+    "esbuild": "0.28.2",
+    "typescript": "~5.9.2",
+    "vitest": "~3.2.4"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "playwright-core": "^1.63.0",
+    "zod": "^4.6.5"
+  }
+}

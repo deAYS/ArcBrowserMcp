@@ -1,0 +1,5 @@
+{
+  "publicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmsoguL2iC9S7MqF1G6Pcp298G/eO+PZIrNG2ZaAnZJ1pf7pd1JbFVRTuxwWFWk+XXwVJNoMQy9I1sj74RQ2u8fGBUz6LJX2AW/q2PfbAaTNmE4iM2DRYnJP2Jg5gLsf6T+pyA5LVwNivUfcW2rzBDl5rKXGv3toNV6ih4BmU8BDAu4e2Ds7dYIMvcoUFDIug/fRkTfNkiElDFpRw8oC4YCCk7wXvfHgoEsX8BBjsoOFF65PGj1Ze15wXmYMP8EIfKdd3ByFwHzdUrJcsouyRpChoZSDGOPwNz9ojFHqkutIzMLocF3cmNkTPxgn7/iccPMB0c1Zm/ymr44yA4MwuLQIDAQAB",
+  "algorithm": "RSA-2048-SPKI",
+  "usage": "Unpacked development extension ID stability only. Private key is NOT in this repo."
+}

@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Arc MCP Bridge - Development",
+  "version": "0.0.1",
+  "description": "Development-only feasibility probe for arc-mcp browser control. Not production software.",
+  "permissions": ["debugger", "tabs", "storage", "nativeMessaging", "alarms"],
+  "host_permissions": [],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "options_page": "diagnostic/diagnostic.html"
+}
