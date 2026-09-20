@@ -21,6 +21,8 @@ live-test-stderr.txt
 
 .vscode/
 .idea/
+plan/
+
 
 .DS_Store
 Thumbs.db
