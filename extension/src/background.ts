@@ -698,7 +698,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message["type"] === "ARC_MCP_RUN_DIAGNOSTICS") {
     const startedAt = new Date().toISOString();
+    // Local fixture page: focused, offline, deterministic. External example
+    // pages stall when backgrounded, so we open/focus our own status page.
+    // Closing the tab afterwards returns focus to the previous tab.
+    const fixtureUrl = chrome.runtime.getURL("diagnostic/fixture.html");
     runDiagnostics(api, {
+      testUrl: fixtureUrl,
       onProgress: (currentCheck, capabilities) => {
         try {
           diagnosticsProgress = {

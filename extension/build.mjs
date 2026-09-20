@@ -59,6 +59,10 @@ await copyFile(
   path.join(root, "diagnostic", "diagnostic.html"),
   path.join(dist, "diagnostic", "diagnostic.html"),
 );
+await copyFile(
+  path.join(root, "diagnostic", "fixture.html"),
+  path.join(dist, "diagnostic", "fixture.html"),
+);
 
 console.log(`extension build complete: extension/dist/ buildId=${BUILD_ID}`);
 

@@ -220,9 +220,9 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
 
   // ---- main flow (early returns skip remaining steps, never cleanup) ----
   async function flow(): Promise<void> {
-    // ---- tabs.create ----
+    // ---- tabs.create (focused: background tabs get throttled and stall CDP probes) ----
     try {
-      const tab: TestTab = await api.tabs.create({ url: testUrl, active: false });
+      const tab: TestTab = await api.tabs.create({ url: testUrl, active: true });
       if (tab.id === undefined) {
         throw new Error("tabs.create returned no tab id");
       }
@@ -251,9 +251,9 @@ export async function runDiagnostics(api: ChromeApi, options: RunOptions = {}): 
     }
     emit("tabs.query");
 
-    // ---- tabs.update (non-activating: the test tab must stay in the background) ----
+    // ---- tabs.update (keep the test tab focused so rendering/AX/screenshot probes settle) ----
     try {
-      await api.tabs.update(tabId, { active: false });
+      await api.tabs.update(tabId, { active: true });
       capabilities.tabs.update = "pass";
     } catch (error: unknown) {
       capabilities.tabs.update = "fail";

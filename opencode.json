@@ -3,9 +3,10 @@
   "mcp": {
     "arc-mcp": {
       "type": "local",
-      "command": ["node", "dist/index.js"],
+      "command": ["node", "E:\\project\\ArcBrowserMcp\\dist\\index.js"],
+      "cwd": "E:\\project\\ArcBrowserMcp",
       "enabled": true,
-      "timeout": 30000
+      "timeout": 60000
     }
   },
   "permission": {
