@@ -43,6 +43,16 @@ await build({
   logLevel: "info",
 });
 
+await build({
+  entryPoints: [path.join(root, "diagnostic", "fixture.ts")],
+  bundle: true,
+  format: "iife",
+  platform: "browser",
+  target: "es2021",
+  outfile: path.join(dist, "diagnostic", "fixture.js"),
+  logLevel: "info",
+});
+
 await copyFile(path.join(root, "manifest.json"), path.join(dist, "manifest.json"));
 // Inject the stable development identity: the committed public key from
 // identity.json becomes the manifest "key", pinning the unpacked extension
