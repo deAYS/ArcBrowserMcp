@@ -25,6 +25,7 @@ interface ProgressView {
   running: boolean;
   currentCheck: string | null;
   capabilities: Record<string, Record<string, string> | string>;
+  startedAt?: string;
 }
 
 interface BridgeStatusView {
@@ -241,9 +242,27 @@ async function loadPersisted(): Promise<void> {
   }
 }
 
-// Phase hints shown while the worker runs the suite; the worker answers
-// with a single report at the end, so these are elapsed-time guidance
-// (plus the live bridge status below), not per-capability progress.
+// Live run state shared by the ticker and the always-on poller below, so a
+// freshly opened page shows an in-flight run (started from any page) live.
+let liveCheck: string | null = null;
+let liveStartedAtMs: number | null = null;
+let localRun = false;
+
+function elapsedOf(startedAt: unknown): number | null {
+  if (typeof startedAt === "string") {
+    const ms = Date.parse(startedAt);
+    if (!Number.isNaN(ms)) {
+      return Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    }
+  }
+  if (liveStartedAtMs !== null) {
+    return Math.max(0, Math.floor((Date.now() - liveStartedAtMs) / 1000));
+  }
+  return null;
+}
+
+// Phase hints shown while the worker runs the suite; the live currentCheck
+// from the worker wins when present, these are elapsed-time fallback guidance.
 const RUN_PHASES = [
   "Creating the disposable test tab…",
   "Attaching the debugger…",
@@ -252,12 +271,16 @@ const RUN_PHASES = [
   "Detaching and cleaning up the test tab…",
 ];
 
-async function pollProgress(): Promise<string | null> {
+/** Poll one live snapshot; returns true while a run is in flight. */
+async function pollProgress(): Promise<boolean> {
   try {
     const response = await sendMessage({ type: "ARC_MCP_GET_DIAGNOSTICS_PROGRESS" });
     const progress = response["progress"];
     if (!isRecord(progress) || progress["running"] !== true) {
-      return null;
+      if (!localRun) {
+        el("run").removeAttribute("disabled");
+      }
+      return false;
     }
     if (isRecord(progress["capabilities"])) {
       const { pass, fail, other } = renderMatrix(
@@ -266,32 +289,51 @@ async function pollProgress(): Promise<string | null> {
       updateHero(pass, fail, other);
     }
     const current = progress["currentCheck"];
-    return typeof current === "string" ? current : null;
+    liveCheck = typeof current === "string" ? current : liveCheck;
+    if (typeof progress["startedAt"] === "string") {
+      const ms = Date.parse(progress["startedAt"]);
+      if (!Number.isNaN(ms)) {
+        liveStartedAtMs = ms;
+      }
+    }
+    el("run").setAttribute("disabled", "");
+    // A foreign run (or a reload mid-run) has no local ticker, so the poller
+    // itself owns the live status line; the local ticker overwrites this at
+    // 500ms cadence while localRun is true — same text.
+    if (!localRun) {
+      const elapsed = elapsedOf(progress["startedAt"]);
+      const phase = liveCheck
+        ?? (elapsed !== null ? RUN_PHASES[Math.floor(elapsed / 4) % RUN_PHASES.length] : undefined)
+        ?? RUN_PHASES[0]
+        ?? "starting…";
+      el("status").textContent = elapsed === null
+        ? `Running… ${phase}`
+        : `Running… ${elapsed}s elapsed — ${phase}`;
+    }
+    return true;
   } catch {
-    return null;
+    return localRun;
   }
 }
 
 async function run(): Promise<void> {
+  const running = await pollProgress();
+  if (running) {
+    return;
+  }
   const runButton = el("run");
   runButton.setAttribute("disabled", "");
-  const startedAt = Date.now();
-  let liveCheck: string | null = null;
+  localRun = true;
+  liveCheck = null;
+  liveStartedAtMs = Date.now();
   const ticker = window.setInterval(() => {
-    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    const elapsed = Math.floor((Date.now() - (liveStartedAtMs ?? Date.now())) / 1000);
     const phase = liveCheck
       ?? RUN_PHASES[Math.floor(elapsed / 4) % RUN_PHASES.length]
       ?? RUN_PHASES[0]
       ?? "";
     el("status").textContent = `Running… ${elapsed}s elapsed — ${phase}`;
   }, 500);
-  const progressPoll = window.setInterval(() => {
-    void pollProgress().then((check) => {
-      if (check !== null) {
-        liveCheck = check;
-      }
-    });
-  }, 750);
   const bridgePoll = window.setInterval(() => {
     void refreshBridge();
   }, 2000);
@@ -307,10 +349,13 @@ async function run(): Promise<void> {
     el("status").textContent = `Run failed: ${error instanceof Error ? error.message : String(error)}`;
   } finally {
     window.clearInterval(ticker);
-    window.clearInterval(progressPoll);
     window.clearInterval(bridgePoll);
+    localRun = false;
+    liveCheck = null;
+    liveStartedAtMs = null;
     runButton.removeAttribute("disabled");
     void refreshBridge();
+    void pollProgress();
   }
 }
 
@@ -334,5 +379,13 @@ el("bridge").addEventListener("click", () => {
 });
 void (async () => {
   await refreshBridge();
-  await loadPersisted();
+  // If a run is already in flight (started from another page, or this page
+  // reloaded mid-run), show it live instead of the stale persisted report.
+  const live = await pollProgress();
+  if (!live) {
+    await loadPersisted();
+  }
+  window.setInterval(() => {
+    void pollProgress();
+  }, 1000);
 })();

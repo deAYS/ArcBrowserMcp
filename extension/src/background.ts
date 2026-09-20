@@ -660,7 +660,7 @@ bridge.onRemoteRequest(async (method, payload, _id) => {
   throw new Error(`unknown bridge method ${method}`);
 });
 
-bridge.ensureConnected();
+bridge.ensureConnected("worker-start");
 
 // MV3 service workers suspend when idle, which kills setTimeout-based
 // retry. The repeating alarm below is the wake-safe reconnect safety net
@@ -688,8 +688,22 @@ async function ensureRetryAlarm(): Promise<void> {
 void ensureRetryAlarm();
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === BRIDGE_RETRY_ALARM) {
-    bridge.ensureConnected();
+    bridge.ensureConnected("alarm");
   }
+});
+
+// Event-driven wake: these fire on real user/browser activity and wake a
+// suspended worker immediately, so the bridge reconnects on interaction
+// instead of waiting for the next alarm tick. The alarm above stays as the
+// safety net for fully idle browsers. ensureConnected is idempotent.
+chrome.tabs.onActivated.addListener(() => {
+  bridge.ensureConnected("tab-activated");
+});
+chrome.windows.onFocusChanged.addListener(() => {
+  bridge.ensureConnected("window-focus");
+});
+chrome.runtime.onStartup.addListener(() => {
+  bridge.ensureConnected("startup");
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -697,7 +711,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return false;
   }
   if (message["type"] === "ARC_MCP_RUN_DIAGNOSTICS") {
+    if (diagnosticsProgress?.running === true) {
+      sendResponse({ ok: false, error: "diagnostics already running" });
+      return false;
+    }
     const startedAt = new Date().toISOString();
+    // Visible synchronously so a freshly opened page polling progress sees
+    // the live run before the first check settles; onProgress refines it.
+    diagnosticsProgress = {
+      running: true,
+      currentCheck: "starting",
+      capabilities: (diagnosticsProgress?.capabilities ?? {}) as CapabilityMatrix,
+      startedAt,
+    };
     // Local fixture page: focused, offline, deterministic. External example
     // pages stall when backgrounded, so we open/focus our own status page.
     // Closing the tab afterwards returns focus to the previous tab.
@@ -733,7 +759,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
   if (message["type"] === "ARC_MCP_GET_BRIDGE_STATUS") {
     // Any UI interaction wakes the worker: use it as a connect trigger too.
-    bridge.ensureConnected();
+    bridge.ensureConnected("message");
     sendResponse({ ok: true, status: { ...bridge.getStatus(), buildId: __BUILD_ID__ } });
     return false;
   }

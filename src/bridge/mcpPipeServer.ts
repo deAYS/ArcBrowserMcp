@@ -49,6 +49,7 @@ export class McpPipeServer {
   private sessionPath: string | null = null;
   private session: BridgeSession | null = null;
   private ownSession = false;
+  private listenStartedAt = 0;
   private readonly stateListeners: Array<(state: RelayState) => void> = [];
 
   constructor(private readonly options: McpPipeServerOptions) {}
@@ -111,6 +112,7 @@ export class McpPipeServer {
     await mkdir(sessionDir, { recursive: true });
     await writeSessionAtomic(sessionPath, session);
     this.ownSession = true;
+    this.listenStartedAt = Date.now();
     this.log("info", "bridge pipe listening", { pipeName });
     return { pipeName, pid: process.pid };
   }
@@ -195,7 +197,7 @@ export class McpPipeServer {
       relay.authed = true;
       this.relay = relay;
       this.setState("connected");
-      this.log("info", "bridge relay authenticated");
+      this.log("info", "bridge relay authenticated", { relayWaitMs: Date.now() - this.listenStartedAt });
       return { ok: true, bridgeVersion: BRIDGE_PROTOCOL_VERSION, mcpPid: process.pid };
     }
     if (!relay.authed) {

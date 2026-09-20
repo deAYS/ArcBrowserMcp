@@ -70,6 +70,13 @@ describe("ExtensionBridge", () => {
     expect(port.posted[0]).toMatchObject({ version: 1, id: "ping-9", type: "response", ok: true });
   });
 
+  it("records the wake source of the connection attempt", () => {
+    const port = mockPort();
+    const bridge = new ExtensionBridge(() => port);
+    bridge.ensureConnected("tab-activated");
+    expect(bridge.getStatus()).toMatchObject({ connected: true, lastWakeSource: "tab-activated" });
+  });
+
   it("answers unknown methods with a structured error", async () => {
     const port = mockPort();
     const bridge = new ExtensionBridge(() => port);

@@ -195,6 +195,27 @@ describe("ArcExtensionEngine lifecycle", () => {
     expect((await engine.status()).connected).toBe(true);
   });
 
+  it("runs preflight once per process across reconnects", async () => {
+    const fake = new FakeRuntime();
+    let checks = 0;
+    const engine = new ArcExtensionEngine({
+      runtime: fake,
+      extensionId: EXTENSION_ID,
+      connectTimeoutMs: 2_000,
+      checkPrerequisites: () => {
+        checks += 1;
+        return Promise.resolve([]);
+      },
+    });
+    for (let i = 0; i < 2; i += 1) {
+      const connecting = engine.connect();
+      fake.setRelay(true);
+      await connecting;
+      await engine.disconnect();
+    }
+    expect(checks).toBe(1);
+  });
+
   it("fails after repeated verification timeouts within the connect budget", async () => {
     const fake = new FakeRuntime();
     const fakeEngine = new ArcExtensionEngine({

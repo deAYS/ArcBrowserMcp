@@ -220,6 +220,10 @@ export class ArcExtensionEngine implements BrowserEngine {
   private shuttingDown = false;
   private unsubscribeRelay: (() => void) | null = null;
   private selectedTabId: TabId | null = null;
+  // Successful preflight (manifest + registry) is memoized: neither changes
+  // mid-process, so reconnects skip the reg.exe/powershell cold spawns.
+  // Failures are never cached — a later bridge:install must be picked up.
+  private preflightPassed = false;
 
   constructor(private readonly options: ArcExtensionEngineOptions) {}
 
@@ -354,13 +358,16 @@ export class ArcExtensionEngine implements BrowserEngine {
     try {
       const check = this.options.checkPrerequisites ??
         (() => checkBridgePrerequisites({ expectedOrigin: this.expectedOrigin() }));
-      const issues = await check();
-      if (issues.length > 0) {
-        const first = issues[0];
-        throw new BridgeError(
-          "BRIDGE_PREFLIGHT_FAILED",
-          first === undefined ? "bridge prerequisites failed" : first.remediation,
-        );
+      if (!this.preflightPassed) {
+        const issues = await check();
+        if (issues.length > 0) {
+          const first = issues[0];
+          throw new BridgeError(
+            "BRIDGE_PREFLIGHT_FAILED",
+            first === undefined ? "bridge prerequisites failed" : first.remediation,
+          );
+        }
+        this.preflightPassed = true;
       }
       this.observeRelay();
       await this.runtime.start();
@@ -377,9 +384,12 @@ export class ArcExtensionEngine implements BrowserEngine {
       let verifyAttempts = 0;
       while (!verified && Date.now() < verifyDeadline) {
         try {
-          // ponytail: first probe uses a short timeout, retries keep the full one
-          const probeTimeout =
+          // ponytail: first probe uses a short timeout, retries keep the full one.
+          // All probes are clamped to the remaining verify budget so connect()
+          // honors its deadline instead of overshooting by a full timeout.
+          const baseTimeout =
             verifyAttempts === 0 ? Math.min(this.statusTimeoutMs(), FIRST_VERIFY_TIMEOUT_MS) : this.statusTimeoutMs();
+          const probeTimeout = Math.min(baseTimeout, Math.max(verifyDeadline - Date.now(), 0));
           verifyAttempts += 1;
           await this.runtime.request("bridge.status", {}, probeTimeout);
           verified = true;

@@ -31,6 +31,8 @@ export interface BridgeStatus {
   readonly connected: boolean;
   readonly attempts: number;
   readonly lastError: string | null;
+  /** Which trigger started the current/last connection attempt (wake-cause tracking). */
+  readonly lastWakeSource: string | null;
 }
 
 export interface BridgeClientOptions {
@@ -68,6 +70,7 @@ export class ExtensionBridge {
   private lastError: string | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
+  private lastWakeSource: string | null = null;
   private readonly pending = new Map<
     string,
     { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
@@ -81,7 +84,7 @@ export class ExtensionBridge {
   ) {}
 
   getStatus(): BridgeStatus {
-    return { connected: this.port !== null, attempts: this.attempts, lastError: this.lastError };
+    return { connected: this.port !== null, attempts: this.attempts, lastError: this.lastError, lastWakeSource: this.lastWakeSource };
   }
 
   onRemoteRequest(handler: RemoteRequestHandler): void {
@@ -92,10 +95,11 @@ export class ExtensionBridge {
   }
 
   /** Connect now unless already connected/connecting. Safe to call often. */
-  ensureConnected(): void {
+  ensureConnected(source = "unknown"): void {
     if (this.closed || this.port !== null || this.connecting) {
       return;
     }
+    this.lastWakeSource = source;
     this.connecting = true;
     try {
       const port = this.connectNative(this.options.hostName ?? BRIDGE_HOST_NAME);
@@ -193,7 +197,7 @@ export class ExtensionBridge {
     );
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
-      this.ensureConnected();
+      this.ensureConnected("retry");
     }, delay);
   }
 
