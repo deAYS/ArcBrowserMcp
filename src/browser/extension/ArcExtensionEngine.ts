@@ -98,6 +98,9 @@ export interface ArcExtensionEngineOptions {
 
 export const DEFAULT_EXTENSION_CONNECT_TIMEOUT_MS = 120_000;
 const DEFAULT_OPERATION_TIMEOUT_MS = 15_000;
+// First verify probe fails fast: a healthy relay answers bridge.status in
+// ms, so a full-timeout block means the worker suspended again.
+const FIRST_VERIFY_TIMEOUT_MS = 5_000;
 
 /** Schemes that must never be opened/created. */
 const BLOCKED_CREATE_SCHEMES = ["javascript:", "data:", "file:", "chrome:", "chrome-extension:", "arc:", "devtools:", "view-source:"];
@@ -371,9 +374,14 @@ export class ArcExtensionEngine implements BrowserEngine {
       const verifyDeadline = Date.now() + Math.max(this.statusTimeoutMs(), Math.floor(timeoutMs() / 3));
       let verified = false;
       let lastError: unknown = null;
+      let verifyAttempts = 0;
       while (!verified && Date.now() < verifyDeadline) {
         try {
-          await this.runtime.request("bridge.status", {}, this.statusTimeoutMs());
+          // ponytail: first probe uses a short timeout, retries keep the full one
+          const probeTimeout =
+            verifyAttempts === 0 ? Math.min(this.statusTimeoutMs(), FIRST_VERIFY_TIMEOUT_MS) : this.statusTimeoutMs();
+          verifyAttempts += 1;
+          await this.runtime.request("bridge.status", {}, probeTimeout);
           verified = true;
         } catch (error: unknown) {
           lastError = error;
