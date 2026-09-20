@@ -10,6 +10,7 @@
     }
   },
   "permission": {
+    "arc-mcp_*": "allow",
     "skill": {
       "*": "allow",
       "arc-interact": "ask"
