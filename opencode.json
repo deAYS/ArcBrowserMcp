@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "arc-mcp": {
+      "type": "local",
+      "command": ["node", "dist/index.js"],
+      "enabled": true,
+      "timeout": 10000
+    }
+  },
+  "permission": {
+    "skill": {
+      "*": "allow",
+      "arc-interact": "ask"
+    }
+  }
+}
