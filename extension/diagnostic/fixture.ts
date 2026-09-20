@@ -1,64 +1,63 @@
 /**
- * Fixture tab live status (runs in the disposable diagnostics test tab).
- * The suite focuses this tab while it runs, so the status line and tab
- * title below are the visible progress surface: polled from the service
- * worker, never driven by the runner itself.
- * No imports: this file is bundled standalone by esbuild.
+ * Fixture tab mirror of the diagnostics page (bundled by esbuild).
+ * The suite focuses this disposable test tab while it runs, so this page
+ * renders the same live status, verdict, environment, bridge, matrix,
+ * notes, evidence, and JSON as diagnostic.html — view-only.
+ * It never starts a run itself; the tab is removed when the run ends.
  */
 
-void ((): void => {
+import {
+  RUN_PHASES,
+  el,
+  isRecord,
+  refreshBridgeStatus,
+  render,
+  renderMatrix,
+  sendMessage,
+  updateHero,
+  type ProgressView,
+  type RenderableReport,
+} from "./view.js";
 
-const IDLE_TEXT = "OK — disposable test tab ready";
 const IDLE_TITLE = "Arc MCP Diagnostic Fixture";
 
-function el(id: string): HTMLElement {
-  const node = document.getElementById(id);
-  if (node === null) {
-    throw new Error(`missing element #${id}`);
-  }
-  return node;
-}
+let lastBuildId = "";
+let lastJson = "";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function sendMessage(message: Record<string, unknown>): Promise<Record<string, unknown>> {
-  return new Promise((resolve, reject) => {
-    try {
-      chrome.runtime.sendMessage(message, (response: unknown) => {
-        if (chrome.runtime.lastError !== undefined) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        resolve((response ?? {}) as Record<string, unknown>);
-      });
-    } catch (error: unknown) {
-      reject(error instanceof Error ? error : new Error(String(error)));
-    }
-  });
-}
-
-function settledCounts(capabilities: unknown): string {
-  if (!isRecord(capabilities)) {
-    return "";
-  }
-  let pass = 0;
-  let fail = 0;
-  for (const checks of Object.values(capabilities)) {
-    if (isRecord(checks)) {
-      for (const value of Object.values(checks)) {
-        if (value === "pass") {
-          pass += 1;
-        } else if (value === "fail") {
-          fail += 1;
-        }
-      }
+function elapsedOf(startedAt: unknown): number | null {
+  if (typeof startedAt === "string") {
+    const ms = Date.parse(startedAt);
+    if (!Number.isNaN(ms)) {
+      return Math.max(0, Math.floor((Date.now() - ms) / 1000));
     }
   }
-  return `${String(pass)} pass, ${String(fail)} fail`;
+  return null;
 }
 
+async function showPersisted(): Promise<void> {
+  let response: Record<string, unknown>;
+  try {
+    response = await sendMessage({ type: "ARC_MCP_GET_REPORT" });
+  } catch {
+    el("status").textContent = "Idle. Could not reach the service worker.";
+    return;
+  }
+  if (response["ok"] !== true || !isRecord(response["report"])) {
+    el("status").textContent = "Idle — waiting for a diagnostics run. Start one from the diagnostics page.";
+    document.title = IDLE_TITLE;
+    return;
+  }
+  const json = JSON.stringify(response["report"]);
+  if (json === lastJson) {
+    return;
+  }
+  lastJson = json;
+  render(response["report"] as RenderableReport, lastBuildId);
+  el("status").textContent = "Run complete.";
+  document.title = IDLE_TITLE;
+}
+
+/** Poll one live snapshot; falls back to the persisted report when idle. */
 async function pollOnce(): Promise<void> {
   let progress: Record<string, unknown> | null = null;
   try {
@@ -69,32 +68,49 @@ async function pollOnce(): Promise<void> {
   } catch {
     progress = null;
   }
-  const status = el("status");
   if (progress === null) {
-    if (status.textContent !== IDLE_TEXT) {
-      status.textContent = IDLE_TEXT;
-      document.title = IDLE_TITLE;
-    }
+    await showPersisted();
     return;
+  }
+  if (isRecord(progress["capabilities"])) {
+    const { pass, fail, other } = renderMatrix(
+      progress["capabilities"] as ProgressView["capabilities"],
+    );
+    updateHero(pass, fail, other);
   }
   const current = progress["currentCheck"];
   const check = typeof current === "string" && current !== "" ? current : "starting…";
-  let elapsed = "";
-  const startedAt = progress["startedAt"];
-  if (typeof startedAt === "string") {
-    const ms = Date.parse(startedAt);
-    if (!Number.isNaN(ms)) {
-      elapsed = `${String(Math.max(0, Math.floor((Date.now() - ms) / 1000)))}s · `;
-    }
-  }
-  const counts = settledCounts(progress["capabilities"]);
-  const line = `Running… ${elapsed}${check}${counts === "" ? "" : ` (${counts})`}`;
-  status.textContent = line;
+  const elapsed = elapsedOf(progress["startedAt"]);
+  const phase = current === null || current === ""
+    ? RUN_PHASES[Math.floor((elapsed ?? 0) / 4) % RUN_PHASES.length] ?? "starting…"
+    : check;
+  el("status").textContent = elapsed === null
+    ? `Running… ${phase}`
+    : `Running… ${elapsed}s elapsed — ${phase}`;
   document.title = `(${check}) ${IDLE_TITLE}`;
 }
 
-window.setInterval(() => {
-  void pollOnce();
-}, 750);
-void pollOnce();
+async function refreshBridge(): Promise<void> {
+  const buildId = await refreshBridgeStatus();
+  if (buildId !== "" && buildId !== lastBuildId) {
+    lastBuildId = buildId;
+    if (lastJson !== "") {
+      render(JSON.parse(lastJson) as RenderableReport, lastBuildId);
+    }
+  }
+}
+
+el("open-diagnostics").addEventListener("click", () => {
+  void chrome.tabs.create({ url: chrome.runtime.getURL("diagnostic/diagnostic.html") });
+});
+
+void (async () => {
+  await refreshBridge();
+  await pollOnce();
+  window.setInterval(() => {
+    void pollOnce();
+  }, 1000);
+  window.setInterval(() => {
+    void refreshBridge();
+  }, 5000);
 })();

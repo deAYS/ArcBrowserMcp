@@ -4,21 +4,74 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Arc MCP Diagnostic Fixture</title>
-  <style>
-    :root { color-scheme: dark; }
-    body { font-family: system-ui, sans-serif; background: #0d1117; color: #e6e9ee; margin: 0; padding: 2rem; }
-    main { max-width: 40rem; margin: 0 auto; }
-    .ok { color: #4ade80; font-weight: 700; }
-  </style>
+  <link rel="stylesheet" href="diagnostic.css">
 </head>
 <body>
-  <main>
-    <h1>Arc MCP Diagnostic Fixture</h1>
-    <p class="ok" id="status">OK — disposable test tab ready</p>
-    <p>This local extension page is the diagnostics test target. It replaces the
-      external example page so the suite runs focused, offline, and deterministically.
-      This tab shows the live check status while a run is in flight.</p>
-  </main>
+  <div class="sticky">
+    <div class="topbar">
+      <div class="brand">
+        <h1>Arc MCP Diagnostic Fixture</h1>
+        <span class="eyebrow">Diagnostics · Live test tab</span>
+      </div>
+      <div class="actions">
+        <button class="btn secondary" id="open-diagnostics">Open full diagnostics</button>
+      </div>
+    </div>
+    <div class="progress"><div id="progress-fill"></div></div>
+  </div>
+
+  <p class="intro">This local extension page is the diagnostics test target — the
+    suite focuses this disposable tab while it runs (offline, deterministic).
+    It mirrors the full diagnostics page live; the tab is removed when the run ends.</p>
+
+  <section class="card hero">
+    <div>
+      <p id="status">Idle — waiting for a diagnostics run.</p>
+      <p id="verdict" class="verdict-unknown">Verdict: unknown</p>
+      <p id="summary" class="meta"></p>
+    </div>
+    <div class="counters">
+      <div class="counter"><span id="count-pass">–</span><label>pass</label></div>
+      <div class="counter"><span id="count-fail">–</span><label>fail</label></div>
+      <div class="counter"><span id="count-other">–</span><label>other</label></div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <p class="eyebrow">Environment</p>
+      <table id="env"><tbody></tbody></table>
+    </section>
+    <section class="card">
+      <p class="eyebrow">Native bridge · auto-refreshes during runs</p>
+      <div id="bridge-status">Bridge status unknown.</div>
+    </section>
+  </div>
+
+  <section class="card">
+    <p class="eyebrow">Capability matrix</p>
+    <table id="matrix">
+      <thead><tr><th>Capability</th><th>Status</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <p class="eyebrow">Notes &amp; errors</p>
+    <ul id="notes"></ul>
+    <ul id="errors"></ul>
+  </section>
+
+  <details class="card">
+    <summary>Evidence</summary>
+    <table id="evidence"><tbody></tbody></table>
+  </details>
+
+  <details class="card">
+    <summary>Full report (JSON)</summary>
+    <pre id="report">No report yet.</pre>
+  </details>
+
   <script src="fixture.js"></script>
 </body>
 </html>

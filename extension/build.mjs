@@ -70,6 +70,10 @@ await copyFile(
   path.join(dist, "diagnostic", "diagnostic.html"),
 );
 await copyFile(
+  path.join(root, "diagnostic", "diagnostic.css"),
+  path.join(dist, "diagnostic", "diagnostic.css"),
+);
+await copyFile(
   path.join(root, "diagnostic", "fixture.html"),
   path.join(dist, "diagnostic", "fixture.html"),
 );
