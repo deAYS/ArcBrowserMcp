@@ -4,8 +4,13 @@
  * Owns the debugger lifecycle for page inspection through the small
  * DebuggerSessionManager below:
  * - project TabId -> numeric Chrome tab resolution (via injected resolver)
- * - lazy persistent attachment (policy B): attach on first snapshot, retain
- *   while the tab remains useful; detach never steals a foreign session
+ * - lazy attachment with an idle lifetime: attach on first use, detach
+ *   after 60 s without CDP traffic (plus an opportunistic sweep whenever
+ *   work starts on another tab and a 1-minute alarm for fully idle
+ *   browsers); detach never steals a foreign session. Refs and cursor
+ *   state survive idle detaches, so the next operation reattaches
+ *   transparently — only the automation surface (infobar + CDP
+ *   observability) and live event domains are dropped.
  * - external onDetach handling clears ownership and invalidates refs
  * - tab close / navigation / external same-URL reload invalidates refs
  *   (fail closed, never retarget)
@@ -180,6 +185,19 @@ export type CdpCapabilityMethod<K extends CdpCapability> = (typeof CDP_CAPABILIT
  * reattachment.
  */
 export const RETIRE_DETACH_TIMEOUT_MS = 3_000;
+
+/**
+ * Idle debugger lifetime: an owned attachment with no CDP traffic for this
+ * long is detached (default 60 s, overridable for tests). Rationale: a
+ * persistently attached debugger is a strong automation signal (infobar +
+ * CDP side-effects observable by page JavaScript for the whole session),
+ * which is what gets regular browsing flagged by bot vendors. Refs and
+ * cursor state survive the detach (renderer-side ids are unaffected), so
+ * the next operation reattaches transparently — the only cost is one
+ * attach round-trip and a gap in console/network event collection while
+ * detached (buffers keep already-captured entries).
+ */
+export const IDLE_DETACH_TIMEOUT_MS = 60_000;
 
 /** Max DOM.describeNode probes per capture (password detection only). */
 const MAX_PASSWORD_PROBES = 20;
@@ -357,6 +375,9 @@ export class DebuggerSessionManager {
   private readonly sessionState = new Map<number, "OWNED" | "RETIRING" | "UNCERTAIN">();
   private readonly retireWaiters = new Map<number, Promise<void>>();
   private retireDetachTimeoutMs = RETIRE_DETACH_TIMEOUT_MS;
+  /** Last CDP traffic per tab; drives the idle-detach sweep. */
+  private readonly lastCdpActivityMs = new Map<number, number>();
+  private idleDetachTimeoutMs = IDLE_DETACH_TIMEOUT_MS;
   private sessionId: string | null = null;
   private counter = 0;
   private initialized = false;
@@ -378,6 +399,13 @@ export class DebuggerSessionManager {
   setRetireDetachTimeoutMsForTests(timeoutMs: number): void {
     if (Number.isInteger(timeoutMs) && timeoutMs >= 0) {
       this.retireDetachTimeoutMs = timeoutMs;
+    }
+  }
+
+  /** Test hook: override the idle-detach lifetime. */
+  setIdleDetachTimeoutMsForTests(timeoutMs: number): void {
+    if (Number.isInteger(timeoutMs) && timeoutMs >= 0) {
+      this.idleDetachTimeoutMs = timeoutMs;
     }
   }
 
@@ -636,6 +664,7 @@ export class DebuggerSessionManager {
     this.owned.delete(chromeId);
     this.sessionState.delete(chromeId);
     this.retireWaiters.delete(chromeId);
+    this.lastCdpActivityMs.delete(chromeId);
     this.entries.delete(chromeId);
     this.clearObservabilityForChrome(chromeId);
   }
@@ -648,6 +677,7 @@ export class DebuggerSessionManager {
       // idempotently to DETACHED instead of hanging in RETIRING/UNCERTAIN.
       this.sessionState.clear();
       this.retireWaiters.clear();
+      this.lastCdpActivityMs.clear();
       for (const entry of this.entries.values()) {
         entry.refs.clear();
       }
@@ -675,6 +705,7 @@ export class DebuggerSessionManager {
     this.owned.delete(chromeId);
     this.sessionState.delete(chromeId);
     this.retireWaiters.delete(chromeId);
+    this.lastCdpActivityMs.delete(chromeId);
     this.clearObservabilityDomains(chromeId);
     const entry = this.entries.get(chromeId);
     if (entry !== undefined) {
@@ -682,8 +713,50 @@ export class DebuggerSessionManager {
     }
   }
 
+  /**
+   * Idle sweep: detach positively-owned attachments with no CDP traffic
+   * within the idle lifetime. Only OWNED tabs are touched (never foreign,
+   * retiring, or uncertain sessions). Snapshot refs, cursor memory, and
+   * buffered observability entries survive — only ownership and live
+   * event domains are dropped, so the next operation reattaches
+   * transparently. Returns the number of tabs detached. The requesting tab
+   * is excluded (it is about to be used); pass nothing from the periodic
+   * alarm to sweep everything idle.
+   */
+  async detachIdleTabs(nowMs: number = Date.now(), exceptChromeId?: number): Promise<number> {
+    let detached = 0;
+    for (const chromeId of [...this.owned]) {
+      if (exceptChromeId !== undefined && chromeId === exceptChromeId) {
+        continue;
+      }
+      if (this.sessionState.get(chromeId) !== "OWNED") {
+        continue;
+      }
+      // Attached but never used yet: treat as fresh, never stale.
+      const lastActivity = this.lastCdpActivityMs.get(chromeId) ?? nowMs;
+      if (nowMs - lastActivity < this.idleDetachTimeoutMs) {
+        continue;
+      }
+      try {
+        await this.detachWithTimeout(chromeId, this.retireDetachTimeoutMs);
+      } catch {
+        // Tab may already be gone; ownership is cleared regardless, same
+        // as the shutdown path (a stale record must never pin the infobar).
+      }
+      this.owned.delete(chromeId);
+      this.sessionState.delete(chromeId);
+      this.lastCdpActivityMs.delete(chromeId);
+      // Domain-enabled state must not survive the attachment (sanitized
+      // buffers stay readable; the next get re-enables).
+      this.clearObservabilityDomains(chromeId);
+      detached += 1;
+    }
+    return detached;
+  }
+
   /** Best-effort release of owned sessions (bridge shutdown path). */
   async detachAllOwned(): Promise<void> {
+
     const owned = [...this.owned];
     for (const chromeId of owned) {
       if (this.sessionState.get(chromeId) === "RETIRING") {
@@ -697,6 +770,7 @@ export class DebuggerSessionManager {
       }
       this.owned.delete(chromeId);
       this.sessionState.delete(chromeId);
+      this.lastCdpActivityMs.delete(chromeId);
       // The attachment is gone: domain-enabled state must not survive it
       // (sanitized buffers stay readable; the next get re-enables).
       this.clearObservabilityDomains(chromeId);
@@ -1773,6 +1847,10 @@ export class DebuggerSessionManager {
         `tab ${JSON.stringify(projectTabId)} debugger session is uncertain after a retirement failure`,
       );
     }
+    // Opportunistic hygiene: starting work on this tab reaps other tabs
+    // whose debugger has idled out (drops their infobar + CDP exposure).
+    // This tab is excluded; its own activity is stamped by the sends below.
+    await this.detachIdleTabs(Date.now(), chromeId);
     if (this.owned.has(chromeId)) {
       return;
     }
@@ -1812,6 +1890,9 @@ export class DebuggerSessionManager {
     if (!this.methodAllowed(method)) {
       throw new SnapshotError("SNAPSHOT_FAILED", `refusing non-allowlisted debugger method ${method}`);
     }
+    // Every CDP command counts as debugger activity (single funnel for all
+    // scoped senders), keeping the idle-detach lifetime honest.
+    this.lastCdpActivityMs.set(chromeId, Date.now());
     return this.debuggerChrome.sendCommand(chromeId, method, params);
   }
 

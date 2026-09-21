@@ -792,6 +792,32 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
+// Idle debugger sweep (same 1-minute wake-safe cadence): detach owned
+// debugger sessions with no recent CDP traffic so the automation surface
+// (infobar + CDP observability) drops within ~2 minutes of last use.
+// Refs and buffers survive; the next operation reattaches transparently.
+const IDLE_SWEEP_ALARM = "arc-mcp-idle-sweep";
+
+async function ensureIdleSweepAlarm(): Promise<void> {
+  const create = (): Promise<void> =>
+    chrome.alarms.create(IDLE_SWEEP_ALARM, { periodInMinutes: 1, persistAcrossSessions: true });
+  try {
+    const existing = await chrome.alarms.get(IDLE_SWEEP_ALARM);
+    if (existing === undefined) {
+      await create();
+    }
+  } catch {
+    await create();
+  }
+}
+
+void ensureIdleSweepAlarm();
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === IDLE_SWEEP_ALARM) {
+    void snapshotManager.detachIdleTabs().catch(() => undefined);
+  }
+});
+
 // Event-driven wake: these fire on real user/browser activity and wake a
 // suspended worker immediately, so the bridge reconnects on interaction
 // instead of waiting for the next alarm tick. The alarm above stays as the

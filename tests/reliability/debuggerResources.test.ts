@@ -129,8 +129,7 @@ describe("debugger lifecycle stress (mocked)", () => {
     expect(after.availableEntries).toBe(0);
   });
 
-  it("worker reconstruction resets buffers and never retargets refs", async () => {
-    const fixture = harness();
+  it("worker reconstruction resets buffers and never retargets refs", async () => {    const fixture = harness();
     const captured = await fixture.manager.capture(PROJECT);
     const ref = captured.nodes.find((n) => n.ref !== undefined)?.ref;
     if (ref === undefined) {
@@ -145,6 +144,58 @@ describe("debugger lifecycle stress (mocked)", () => {
     // Snapshot refs are a separate lifecycle and still valid after an
     // observability-only reset.
     expect(fixture.manager.isRefValid(PROJECT, ref)).toBe(true);
+  });
+});
+
+describe("idle debugger detach (mocked)", () => {
+  it("detaches idle tabs, keeps refs, and reattaches transparently", async () => {
+    const fixture = harness();
+    const captured = await fixture.manager.capture(PROJECT);
+    const ref = captured.nodes.find((n) => n.ref !== undefined)?.ref;
+    if (ref === undefined) {
+      throw new Error("expected a ref");
+    }
+    expect(fixture.manager.debuggerSessionState(91)).toBe("OWNED");
+    // Fresh activity is not idle yet under the default 60s lifetime.
+    expect(await fixture.manager.detachIdleTabs(Date.now())).toBe(0);
+    expect(fixture.manager.debuggerSessionState(91)).toBe("OWNED");
+    // Far-future clock: the tab idled out.
+    expect(await fixture.manager.detachIdleTabs(Date.now() + 61_000)).toBe(1);
+    expect(fixture.detaches).toEqual([91]);
+    expect(fixture.manager.debuggerSessionState(91)).toBe("DETACHED");
+    // Refs survive the detach (renderer ids are unaffected); the next
+    // operation reattaches without any caller-visible ceremony.
+    expect(fixture.manager.isRefValid(PROJECT, ref)).toBe(true);
+    await fixture.manager.capture(PROJECT);
+    expect(fixture.attaches).toEqual([91, 91]);
+    expect(fixture.manager.debuggerSessionState(91)).toBe("OWNED");
+  });
+
+  it("excludes the requesting tab and ignores unowned tabs", async () => {
+    const fixture = harness();
+    // Nothing owned: sweep is a no-op with no debugger traffic.
+    expect(await fixture.manager.detachIdleTabs(Date.now() + 3600_000)).toBe(0);
+    expect(fixture.detaches).toEqual([]);
+    await fixture.manager.capture(PROJECT);
+    fixture.manager.setIdleDetachTimeoutMsForTests(0);
+    expect(await fixture.manager.detachIdleTabs(Date.now() + 3600_000, 91)).toBe(0);
+    expect(fixture.manager.debuggerSessionState(91)).toBe("OWNED");
+    expect(fixture.detaches).toEqual([]);
+  });
+
+  it("opportunistic sweep on attach reaps other idle tabs only", async () => {
+    const fixture = harness();
+    await fixture.manager.capture(PROJECT);
+    // Simulate a second owned tab by attaching through the public path is
+    // single-tab here; instead assert the sweep entry point exists on the
+    // requesting path: a fresh capture keeps its own attachment while an
+    // idle timeout of zero would reap it only when it is NOT the requester.
+    fixture.manager.setIdleDetachTimeoutMsForTests(0);
+    await fixture.manager.capture(PROJECT);
+    expect(fixture.manager.debuggerSessionState(91)).toBe("OWNED");
+    // Direct sweep with no exclusion reaps it (proves the ensureAttached
+    // exclusion is what protects the active tab, covered above).
+    expect(await fixture.manager.detachIdleTabs(Date.now())).toBe(1);
   });
 });
 

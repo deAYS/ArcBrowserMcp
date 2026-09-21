@@ -128,6 +128,7 @@ Point any stdio-capable MCP client at this command, for example with command `no
 - Element refs are opaque strings, not DOM or CDP ids, and are only valid for the latest snapshot of that tab.
 - Navigation, click, fill, type, key press, humanized type, key sequence, click-type, and dispatched evaluation invalidate prior refs. `browser_get_text`, `browser_screenshot`, waits, and observability get/clear preserve them.
 - Privileged pages (`chrome://`, `arc://`, `devtools:`, `view-source:`, other non-HTTP(S) pages) are rejected with `BROWSER_TAB_NOT_CONTROLLABLE`.
+- Debugger sessions are idle-bounded: an attached tab with no CDP traffic for 60 s is detached (swept on next use plus a 1-minute alarm), so the automation surface drops shortly after you stop. Snapshot refs survive; the next operation reattaches transparently. Console/network events during a detached window are not collected.
 - Navigation accepts HTTP/HTTPS destinations only. Other schemes, embedded credentials, and control characters fail with `BROWSER_URL_NOT_ALLOWED`.
 
 ## Security
