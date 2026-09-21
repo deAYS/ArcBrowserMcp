@@ -3,11 +3,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { BridgeError } from "../src/bridge/BridgeError.js";
 import { McpPipeServer } from "../src/bridge/mcpPipeServer.js";
 import { encodeNativeMessage, NativeFrameDecoder } from "../src/bridge/nativeFraming.js";
 import { parseSessionDescriptor } from "../src/bridge/session.js";
-import type { BridgeTransportMethod } from "../src/browser/extension/BridgeRuntime.js";
 import { BridgeRuntime } from "../src/browser/extension/BridgeRuntime.js";
 
 let pipeSerial = 0;
