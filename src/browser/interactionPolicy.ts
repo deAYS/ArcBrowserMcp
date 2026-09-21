@@ -121,6 +121,15 @@ const PUNCTUATION_KEY_CODES: Record<string, { code: string; vk: number }> = {
   "\\": { code: "Backslash", vk: 220 },
   "]": { code: "BracketRight", vk: 221 },
   "'": { code: "Quote", vk: 222 },
+  // Shift-layer US punctuation: single-char keys go through CDP char
+  // events (text is inserted verbatim), so the code only needs to be
+  // plausible — insertion never depends on the OS layout.
+  ":": { code: "Semicolon", vk: 186 },
+  "!": { code: "Digit1", vk: 49 },
+  "?": { code: "Slash", vk: 191 },
+  '"': { code: "Quote", vk: 222 },
+  "(": { code: "Digit9", vk: 57 },
+  ")": { code: "Digit0", vk: 48 },
 };
 
 /** Humanized composite-action bounds (one tool call -> many CDP inputs). */

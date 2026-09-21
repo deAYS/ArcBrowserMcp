@@ -86,7 +86,7 @@ describe("interaction policy", () => {
   });
 
   it("accepts letters, digits, function keys, and shortcuts for sequences", () => {
-    for (const key of ["a", "A", "z", "0", "9", "F1", "F12", ";", ".", "Control+a", "Control+Shift+Enter"]) {
+    for (const key of ["a", "A", "z", "0", "9", "F1", "F12", ";", ".", ":", "!", "?", '"', "(", ")", "Control+a", "Control+Shift+Enter"]) {
       expect(isSupportedPressKey(key), key).toBe(true);
     }
     const chord = parsePressKey("Control+a");
