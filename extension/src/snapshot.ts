@@ -923,7 +923,7 @@ export class DebuggerSessionManager {
     return info.nodeName === "input" && info.type === "file";
   }
 
-  private static isEditableControl(info: { nodeName: string; type: string | null }): boolean {
+  private static isEditableControl(info: { nodeName: string; type: string | null; attributes?: string[] }): boolean {
     if (info.nodeName === "textarea") {
       return true;
     }
@@ -939,6 +939,15 @@ export class DebuggerSessionManager {
         info.type === "url" ||
         info.type === "password"
       );
+    }
+    // Rich editors (Discord/Slack slate, Gmail compose): div/span with
+    // contenteditable=true and textbox semantics. Attributes come from
+    // DOM.describeNode as [name, value, ...].
+    const attrs = info.attributes ?? [];
+    for (let index = 0; index + 1 < attrs.length; index += 2) {
+      if (attrs[index]?.toLowerCase() === "contenteditable" && attrs[index + 1]?.toLowerCase() === "true") {
+        return true;
+      }
     }
     return false;
   }
@@ -1023,7 +1032,7 @@ export class DebuggerSessionManager {
   async clickElement(projectTabId: string, ref: string): Promise<{ clicked: true }> {
     const { chromeId, backendNodeId } = await this.beginInteraction(projectTabId, ref);
     try {
-      let info: { nodeName: string; type: string | null };
+      let info: { nodeName: string; type: string | null; attributes: string[] };
       try {
         info = await this.classifyControl(chromeId, backendNodeId);
       } catch (error: unknown) {
@@ -1074,7 +1083,7 @@ export class DebuggerSessionManager {
   async fillElement(projectTabId: string, ref: string, text: string): Promise<{ filled: true }> {
     const { chromeId, backendNodeId } = await this.beginInteraction(projectTabId, ref, text);
     try {
-      let info: { nodeName: string; type: string | null };
+      let info: { nodeName: string; type: string | null; attributes: string[] };
       try {
         info = await this.classifyControl(chromeId, backendNodeId);
       } catch (error: unknown) {
@@ -1109,7 +1118,7 @@ export class DebuggerSessionManager {
   async typeIntoElement(projectTabId: string, ref: string, text: string): Promise<{ typed: true }> {
     const { chromeId, backendNodeId } = await this.beginInteraction(projectTabId, ref, text);
     try {
-      let info: { nodeName: string; type: string | null };
+      let info: { nodeName: string; type: string | null; attributes: string[] };
       try {
         info = await this.classifyControl(chromeId, backendNodeId);
       } catch (error: unknown) {
@@ -1206,7 +1215,7 @@ export class DebuggerSessionManager {
   }
 
   private async requireEditable(chromeId: number, backendNodeId: number, projectTabId: string): Promise<void> {
-    let info: { nodeName: string; type: string | null };
+    let info: { nodeName: string; type: string | null; attributes: string[] };
     try {
       info = await this.classifyControl(chromeId, backendNodeId);
     } catch (error: unknown) {
@@ -1330,7 +1339,7 @@ export class DebuggerSessionManager {
     void HUMANIZE_WPM_DEFAULT;
     const { chromeId, backendNodeId } = await this.beginInteraction(projectTabId, ref, text);
     try {
-      let info: { nodeName: string; type: string | null };
+      let info: { nodeName: string; type: string | null; attributes: string[] };
       try {
         info = await this.classifyControl(chromeId, backendNodeId);
       } catch (error: unknown) {
