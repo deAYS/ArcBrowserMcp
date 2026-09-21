@@ -4,6 +4,7 @@ extension/dist/
 release/
 coverage/
 data/
+recordings/
 
 .env
 .env.*

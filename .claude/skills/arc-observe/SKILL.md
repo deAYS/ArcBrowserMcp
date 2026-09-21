@@ -6,16 +6,46 @@ allowed-tools: mcp__arc-mcp__browser_screenshot mcp__arc-mcp__browser_console mc
 
 # Arc observability via arc-mcp
 
-Read-only tier: never navigates, mutates, or invalidates snapshot refs. Needs a selected tab (see `arc-navigate`).
+Read-only tier: never navigates, mutates, or invalidates snapshot refs.
+Needs a selected tab (see `arc-navigate`). Safe to interleave with
+`arc-interact` flows between snapshot and action.
 
-## Tools
+## Tool signatures
 
-- `browser_screenshot {}` — current viewport PNG only.
-- `browser_console {action?:"get"|"clear", limit?}` (max 500) — bounded ring buffer.
-- `browser_network {action?, limit?}` — request/response metadata only, no bodies (`hasPostData` boolean marker).
+- `browser_screenshot {}` → `{mimeType: "image/png", dataBase64}`.
+  Viewport only — no full-page option (`fullPage: true` is rejected).
+- `browser_console {action?, limit?}` — `action: "get"` (default) returns
+  `{tabId, monitoring, capacity, availableEntries, returnedEntries,
+  droppedCount, truncated, entries: [{timestamp, level, text,
+  source?}]}`; `action: "clear"` resets the buffer (`{cleared,
+  removedEntries, monitoring}`). `limit` max 500 (default 100).
+- `browser_network {action?, limit?}` — same envelope shape with
+  `entries: [{id, startedAt, method, url, resourceType, requestHeaders,
+  hasPostData, status, statusText, responseHeaders, mimeType, protocol,
+  fromDiskCache, failed, errorText}]`. Bodies are never captured
+  (`hasPostData` is a boolean marker only).
+
+## Buffers and gaps (read this before trusting emptiness)
+
+- Ring buffers live in the extension: console default 200 (max 2000),
+  network default 500 (max 5000), tunable via server env
+  (`ARC_MCP_CONSOLE_BUFFER_ENTRIES`, `ARC_MCP_NETWORK_BUFFER_ENTRIES`).
+  Overflow drops oldest-first and counts `droppedCount`.
+- An MV3 worker restart wipes buffers. An idle debugger detach (60 s
+  without traffic — see `arc-navigate`) pauses event collection until the
+  next operation reattaches. Either produces a silent gap: `clear` first
+  for a clean capture window, then act, then `get`.
+- `truncated: true` or nonzero `droppedCount` means you did not see
+  everything — narrow the window instead of assuming absence.
 
 ## Rules
 
-- Safe to run between snapshot and interaction (see `arc-interact`) without losing refs.
-- Sensitive headers, credentials, and console secret shapes are pre-redacted; secret matching is heuristic, not exhaustive.
-- An MV3 worker restart can clear buffered entries; `clear` first for a clean capture window.
+- Sensitive headers, credentials, and console secret shapes are pre-redacted;
+  secret matching is heuristic, not exhaustive — treat output as
+  semi-sensitive anyway.
+- Console text is capped per entry; long payloads are cut, not paged.
+- `monitoring: false` in a clear/get response means the tab is not currently
+  attached — run any tab operation (or just snapshot) to re-arm, then retry.
+- Errors are typed (`BROWSER_OBSERVABILITY_FAILED`,
+  `BROWSER_NO_SELECTED_TAB`, `BROWSER_TAB_NOT_CONTROLLABLE`) — same recovery
+  as `arc-navigate`/`arc-interact`: re-list, re-select, re-snapshot.

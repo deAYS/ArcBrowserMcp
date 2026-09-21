@@ -143,6 +143,74 @@ export const PRESS_SEQUENCE_MAX_KEYS = 50;
 export const TYPE_HUMAN_CHUNK_SIZE = 4;
 export const CLICK_TYPE_SUBMIT_MAX_KEYS = 1;
 
+// BEGIN HUMAN PROFILE (tuned by scripts/record-human/analyze.mjs --apply; do not hand-edit)
+/**
+ * Fitted human parameters. Defaults are literature values (136M-keystroke
+ * IKI stats, Fitts-law mouse studies); analyze.mjs replaces them with
+ * measurements from your own recordings. Shape: every timing sample is
+ * lognormal(median, sigma) clamped to [floor, cap]; every trajectory is
+ * Bezier + Fitts + overshoot + submovements + tremor (see planMouseMove).
+ */
+export const HUMAN_PROFILE = {
+  /** Shannon Fitts intercept/slope for movement time (ms, ms/bit). */
+  fittsAMs: 100,
+  fittsBMs: 120,
+  /** Lateral Bezier deviation as a fraction of distance (one-sided). */
+  curveMinFraction: 0.06,
+  curveMaxFraction: 0.3,
+  /** Half-normal overshoot scale (px) applied past this distance (px). */
+  overshootSigmaPx: 12,
+  overshootMinDistPx: 250,
+  /** Sinusoidal hand tremor: amplitude (px) and frequency band (Hz). */
+  tremorAmpPx: 0.9,
+  tremorFreqMinHz: 8,
+  tremorFreqMaxHz: 12,
+  /** Pre-click hover dwell (ms). */
+  hoverMedianMs: 120,
+  hoverSigma: 0.55,
+  hoverFloorMs: 40,
+  hoverCapMs: 500,
+  /** Mouse-button hold time (ms). */
+  holdMedianMs: 75,
+  holdSigma: 0.5,
+  holdFloorMs: 30,
+  holdCapMs: 300,
+  /** Inter-key flight time: shape + hard floor/cap (ms). Median comes from WPM. */
+  ikiSigma: 0.45,
+  ikiFloorMs: 60,
+  ikiCapMs: 2000,
+  /** Key hold (dwell) time (ms). */
+  dwellMedianMs: 85,
+  dwellSigma: 0.35,
+  dwellFloorMs: 40,
+  dwellCapMs: 180,
+  /** Multiplier for frequent digraphs (0.72 = 28% faster). */
+  digraphSpeedup: 0.72,
+  /** Extra pause after space / sentence punctuation / newline (ms). */
+  wordPauseMedianMs: 120,
+  wordPauseSigma: 0.6,
+  wordPauseCapMs: 800,
+  sentencePauseMedianMs: 350,
+  sentencePauseSigma: 0.7,
+  sentencePauseFloorMs: 100,
+  sentencePauseCapMs: 1500,
+  newlinePauseMedianMs: 250,
+  newlinePauseSigma: 0.6,
+  newlinePauseFloorMs: 80,
+  newlinePauseCapMs: 1000,
+  /** Occasional thinking pause: probability per keystroke + shape (ms). */
+  thinkingProb: 0.04,
+  thinkingPauseMedianMs: 500,
+  thinkingPauseSigma: 0.6,
+  thinkingPauseFloorMs: 200,
+  thinkingPauseCapMs: 1500,
+  /** Click-point jitter as a fraction of the element half-size. */
+  clickJitterFraction: 0.18,
+  /** Measured natural typing rate; --apply also adopts it as WPM default. */
+  naturalWpm: 80,
+} as const;
+// END HUMAN PROFILE
+
 export interface ParsedKey {
   readonly key: string;
   readonly code: string;
@@ -387,8 +455,6 @@ const FAST_DIGRAPHS = new Set(
   "th he in er an re on at en nd ti es or te of ed is it al ar st to nt ng se ha as ou io le ve co me de hi ri ro ic ne ea ra ce li ch ll be ma si om ur wh ec ot ew gh et fr ow ai rl ss tt oo lf mm".split(" "),
 );
 
-const DIGRAPH_SPEEDUP = 0.72;
-
 /** True for ASCII letters (digraph/dwell fast paths only apply to these). */
 function isAsciiletter(char: string): boolean {
   return char.length === 1 && ((char >= "a" && char <= "z") || (char >= "A" && char <= "Z"));
@@ -411,31 +477,50 @@ export interface KeystrokePlanEntry {
  */
 export function planKeystrokes(text: string, wpm: number, rng: HumanRng = Math.random): KeystrokePlanEntry[] {
   const median = wpmToMedianIkiMs(wpm);
+  const P = HUMAN_PROFILE;
   const chars = Array.from(text);
   const plan: KeystrokePlanEntry[] = [];
   for (let index = 0; index < chars.length; index += 1) {
     const char = chars[index] ?? "";
     const prev = index === 0 ? "" : (chars[index - 1] ?? "");
-    let flight = sampleLognormal(median, 0.45, 60, 2000, rng);
+    let flight = sampleLognormal(median, P.ikiSigma, P.ikiFloorMs, P.ikiCapMs, rng);
     if (prev !== "" && isAsciiletter(prev) && isAsciiletter(char)) {
       const pair = `${prev.toLowerCase()}${char.toLowerCase()}`;
       if (FAST_DIGRAPHS.has(pair)) {
-        flight *= DIGRAPH_SPEEDUP;
+        flight *= P.digraphSpeedup;
       }
     }
     if (prev === " ") {
-      flight += sampleLognormal(120, 0.6, 0, 800, rng);
+      flight += sampleLognormal(P.wordPauseMedianMs, P.wordPauseSigma, 0, P.wordPauseCapMs, rng);
     }
     if (prev === "." || prev === "!" || prev === "?") {
-      flight += sampleLognormal(350, 0.7, 100, 1500, rng);
+      flight += sampleLognormal(
+        P.sentencePauseMedianMs,
+        P.sentencePauseSigma,
+        P.sentencePauseFloorMs,
+        P.sentencePauseCapMs,
+        rng,
+      );
     }
     if (prev === "\n") {
-      flight += sampleLognormal(250, 0.6, 80, 1000, rng);
+      flight += sampleLognormal(
+        P.newlinePauseMedianMs,
+        P.newlinePauseSigma,
+        P.newlinePauseFloorMs,
+        P.newlinePauseCapMs,
+        rng,
+      );
     }
-    if (index > 0 && rng() < 0.04) {
-      flight += sampleLognormal(500, 0.6, 200, 1500, rng);
+    if (index > 0 && rng() < P.thinkingProb) {
+      flight += sampleLognormal(
+        P.thinkingPauseMedianMs,
+        P.thinkingPauseSigma,
+        P.thinkingPauseFloorMs,
+        P.thinkingPauseCapMs,
+        rng,
+      );
     }
-    const dwell = sampleLognormal(85, 0.35, 40, 180, rng);
+    const dwell = sampleLognormal(P.dwellMedianMs, P.dwellSigma, P.dwellFloorMs, P.dwellCapMs, rng);
     plan.push({ char, flightMs: Math.round(Math.min(flight, 4000)), dwellMs: Math.round(dwell) });
   }
   return plan;
@@ -491,18 +576,12 @@ export interface MouseMovePlan {
   readonly durationMs: number;
 }
 
-/** Bounds for the humanized mouse path (one click -> many mouseMoved). */
-export const MOUSE_FITTS_A_MS = 100;
-export const MOUSE_FITTS_B_MS = 120;
-export const MOUSE_MIN_MOVE_MS = 120;
-export const MOUSE_MAX_MOVE_MS = 2000;
+/** Hard safety caps for the mouse path (never fitted, never tuned). */
 export const MOUSE_MAX_TOTAL_MS = 2500;
 export const MOUSE_SAMPLE_INTERVAL_MS = 8;
 export const MOUSE_MAX_STEPS = 250;
-export const MOUSE_OVERSHOOT_DISTANCE_PX = 250;
-export const MOUSE_OVERSHOOT_SIGMA_PX = 12;
-export const MOUSE_TREMOR_AMPLITUDE_PX = 0.9;
-export const MOUSE_CLICK_JITTER_FRACTION = 0.18;
+export const MOUSE_MIN_MOVE_MS = 120;
+export const MOUSE_MAX_MOVE_MS = 2000;
 
 function cubicBezier(p0: number, p1: number, p2: number, p3: number, t: number): number {
   const u = 1 - t;
@@ -535,17 +614,18 @@ export function planMouseMove(
     return { points: [{ x: to.x, y: to.y, dtMs: 0 }], durationMs: 0 };
   }
   const width = Number.isFinite(targetWidthPx) && targetWidthPx > 0 ? targetWidthPx : 8;
-  const fitts = MOUSE_FITTS_A_MS + MOUSE_FITTS_B_MS * Math.log2(1 + (2 * distance) / Math.max(width, 8));
+  const P = HUMAN_PROFILE;
+  const fitts = P.fittsAMs + P.fittsBMs * Math.log2(1 + (2 * distance) / Math.max(width, 8));
   const moveMs = Math.min(Math.max(fitts, MOUSE_MIN_MOVE_MS), MOUSE_MAX_MOVE_MS);
   const side = rng() < 0.5 ? 1 : -1;
-  const curveAmp = (0.06 + rng() * 0.24) * distance * side;
+  const curveAmp = (P.curveMinFraction + rng() * (P.curveMaxFraction - P.curveMinFraction)) * distance * side;
   const cp1f = 0.3 + rng() * 0.15;
   const cp2f = 0.65 + rng() * 0.15;
   const nx = -dy / distance;
   const ny = dx / distance;
   let overshoot = 0;
-  if (distance > MOUSE_OVERSHOOT_DISTANCE_PX) {
-    overshoot = Math.abs(gauss01(rng)) * MOUSE_OVERSHOOT_SIGMA_PX;
+  if (distance > P.overshootMinDistPx) {
+    overshoot = Math.abs(gauss01(rng)) * P.overshootSigmaPx;
   }
   const p3x = to.x + (dx / distance) * overshoot;
   const p3y = to.y + (dy / distance) * overshoot;
@@ -554,8 +634,8 @@ export function planMouseMove(
   const p2x = from.x + dx * cp2f + nx * curveAmp * 0.4;
   const p2y = from.y + dy * cp2f + ny * curveAmp * 0.4;
   const steps = Math.min(Math.max(Math.round(moveMs / MOUSE_SAMPLE_INTERVAL_MS), 8), MOUSE_MAX_STEPS);
-  const tremorFreqX = 8 + rng() * 4;
-  const tremorFreqY = 8 + rng() * 4;
+  const tremorFreqX = P.tremorFreqMinHz + rng() * (P.tremorFreqMaxHz - P.tremorFreqMinHz);
+  const tremorFreqY = P.tremorFreqMinHz + rng() * (P.tremorFreqMaxHz - P.tremorFreqMinHz);
   const tremorPhaseX = rng() * 2 * Math.PI;
   const tremorPhaseY = rng() * 2 * Math.PI;
   const points: MouseWaypoint[] = [];
@@ -563,10 +643,8 @@ export function planMouseMove(
     const t = index / steps;
     const u = raisedCosine(t);
     const elapsed = (index / steps) * moveMs;
-    const tremorX =
-      MOUSE_TREMOR_AMPLITUDE_PX * Math.sin(2 * Math.PI * tremorFreqX * (elapsed / 1000) + tremorPhaseX);
-    const tremorY =
-      MOUSE_TREMOR_AMPLITUDE_PX * Math.sin(2 * Math.PI * tremorFreqY * (elapsed / 1000) + tremorPhaseY);
+    const tremorX = P.tremorAmpPx * Math.sin(2 * Math.PI * tremorFreqX * (elapsed / 1000) + tremorPhaseX);
+    const tremorY = P.tremorAmpPx * Math.sin(2 * Math.PI * tremorFreqY * (elapsed / 1000) + tremorPhaseY);
     points.push({
       x: cubicBezier(from.x, p1x, p2x, p3x, u) + tremorX,
       y: cubicBezier(from.y, p1y, p2y, p3y, u) + tremorY,
@@ -575,7 +653,7 @@ export function planMouseMove(
   }
   // Corrective submovements: each covers 30-60% of the residual error on a
   // short eased segment; the last one lands exactly on the target.
-  const corrections = distance > MOUSE_OVERSHOOT_DISTANCE_PX ? 1 + Math.floor(rng() * 3) : distance > 80 ? (rng() < 0.5 ? 1 : 0) : 0;
+  const corrections = distance > P.overshootMinDistPx ? 1 + Math.floor(rng() * 3) : distance > 80 ? (rng() < 0.5 ? 1 : 0) : 0;
   let cursor = { x: p3x, y: p3y };
   for (let correction = 0; correction < corrections; correction += 1) {
     const last = correction === corrections - 1;
@@ -619,21 +697,23 @@ export function jitterClickPoint(
 ): MousePoint {
   const cx = (box.minX + box.maxX) / 2;
   const cy = (box.minY + box.maxY) / 2;
-  const sigmaX = Math.max((box.maxX - box.minX) / 2, 1) * MOUSE_CLICK_JITTER_FRACTION;
-  const sigmaY = Math.max((box.maxY - box.minY) / 2, 1) * MOUSE_CLICK_JITTER_FRACTION;
+  const sigmaX = Math.max((box.maxX - box.minX) / 2, 1) * HUMAN_PROFILE.clickJitterFraction;
+  const sigmaY = Math.max((box.maxY - box.minY) / 2, 1) * HUMAN_PROFILE.clickJitterFraction;
   const x = Math.min(Math.max(cx + gauss01(rng) * sigmaX, box.minX + 1), Math.max(box.maxX - 1, box.minX + 1));
   const y = Math.min(Math.max(cy + gauss01(rng) * sigmaY, box.minY + 1), Math.max(box.maxY - 1, box.minY + 1));
   return { x, y };
 }
 
-/** Pre-click hover dwell: lognormal around 120ms (40-500ms). */
+/** Pre-click hover dwell: lognormal around the profile median. */
 export function hoverDwellMs(rng: HumanRng = Math.random): number {
-  return Math.round(sampleLognormal(120, 0.55, 40, 500, rng));
+  const P = HUMAN_PROFILE;
+  return Math.round(sampleLognormal(P.hoverMedianMs, P.hoverSigma, P.hoverFloorMs, P.hoverCapMs, rng));
 }
 
-/** Mouse-button hold time: lognormal around 75ms (30-300ms). */
+/** Mouse-button hold time: lognormal around the profile median. */
 export function pressHoldMs(rng: HumanRng = Math.random): number {
-  return Math.round(sampleLognormal(75, 0.5, 30, 300, rng));
+  const P = HUMAN_PROFILE;
+  return Math.round(sampleLognormal(P.holdMedianMs, P.holdSigma, P.holdFloorMs, P.holdCapMs, rng));
 }
 
 /** Typing modes for humanized entry. */
