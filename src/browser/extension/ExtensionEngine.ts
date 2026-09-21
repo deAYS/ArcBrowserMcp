@@ -997,7 +997,7 @@ export class ExtensionEngine implements BrowserEngine {
     }
     // Real key events are slower than inserts: bound the keys-mode budget
     // and scale the RPC timeout with text length (insert keeps its cap).
-    if (mode === "keys" && Array.from(_text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
+    if ((mode === "keys" || mode === "rapid") && Array.from(_text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
       throw browserInvalidText(Array.from(_text).length, HUMAN_KEYS_MODE_MAX_CHARS);
     }
     await this.requireSelectedTab(selectedTabId, "human-type on");
@@ -1069,7 +1069,7 @@ export class ExtensionEngine implements BrowserEngine {
     if (mode === null) {
       throw browserInvalidText(0, INTERACTION_TEXT_LIMIT_BYTES);
     }
-    if (mode === "keys" && Array.from(_text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
+    if ((mode === "keys" || mode === "rapid") && Array.from(_text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
       throw browserInvalidText(Array.from(_text).length, HUMAN_KEYS_MODE_MAX_CHARS);
     }
     const submitKey = _options?.submitKey;

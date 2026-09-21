@@ -24,8 +24,10 @@ with `arc-observe`.
 - `browser_type_human {ref, text, wpm?, mode?}` — `wpm` 20–200 (default 80);
   `mode: "keys"` (default) emits real per-character key events with lognormal
   flight/dwell timing, digraph speedups, and thinking pauses;
-  `mode: "insert"` uses paced CDP inserts (faster, no key-event trail).
-  Password fields always use `insert`. Keys mode caps at 1500 chars.
+  `mode: "insert"` uses paced CDP inserts (faster, no key-event trail);
+  `mode: "rapid"` emits real key events with zero pacing — full event trail
+  at machine speed, for when timing must not slow you down.
+  Password fields always use `insert`. Keys/rapid modes cap at 1500 chars.
 - `browser_press_key {key}` — one key/chord: Enter, Tab, Escape, Backspace,
   Delete, arrows, Home, End, PageUp, PageDown, Space, letters, digits,
   F1–F12, `: ! ? " ( )` and other punctuation, all with optional
@@ -36,7 +38,8 @@ with `arc-observe`.
   the most robotic timing in the toolset — prefer `type_human` for text.
 - `browser_click_type {ref, text, humanize?, wpm?, mode?, submitKey?}` —
   click then type plus one submit key (e.g. `"Enter"`); `humanize` (default
-  true) drives BOTH the mouse path and keystroke pacing. Login/search flows.
+  true) drives BOTH the mouse path and keystroke pacing. `mode` selects
+  `keys` / `insert` / `rapid` typing. Login/search flows.
 - `browser_get_text {ref}` — fresh read of one element; keeps refs.
 - `browser_evaluate {expression, timeoutMs?}` — page JS, by-value result
   only (64 KiB expression cap, bounded result size). Timeouts stop waiting

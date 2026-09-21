@@ -563,8 +563,8 @@ bridge.onRemoteRequest(async (method, payload, _id) => {
       throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.typeHuman field wpm must be an integer");
     }
     const mode = payload["mode"];
-    if (mode !== undefined && mode !== "keys" && mode !== "insert") {
-      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.typeHuman field mode must be keys or insert");
+    if (mode !== undefined && mode !== "keys" && mode !== "insert" && mode !== "rapid") {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.typeHuman field mode must be keys, insert, or rapid");
     }
     try {
       return await snapshotManager.typeHumanElement(
@@ -572,7 +572,7 @@ bridge.onRemoteRequest(async (method, payload, _id) => {
         ref,
         text,
         typeof wpm === "number" ? wpm : undefined,
-        mode === "insert" ? "insert" : "keys",
+        mode === "insert" || mode === "rapid" ? mode : "keys",
       );
     } catch (error: unknown) {
       throw toBridgeSnapshotError(error);
@@ -623,8 +623,8 @@ bridge.onRemoteRequest(async (method, payload, _id) => {
       throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType field wpm must be an integer");
     }
     const clickTypeMode = payload["mode"];
-    if (clickTypeMode !== undefined && clickTypeMode !== "keys" && clickTypeMode !== "insert") {
-      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType field mode must be keys or insert");
+    if (clickTypeMode !== undefined && clickTypeMode !== "keys" && clickTypeMode !== "insert" && clickTypeMode !== "rapid") {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType field mode must be keys, insert, or rapid");
     }
     const submitKey = payload["submitKey"];
     if (submitKey !== undefined && typeof submitKey !== "string") {
@@ -634,7 +634,7 @@ bridge.onRemoteRequest(async (method, payload, _id) => {
       return await snapshotManager.clickTypeElement(tabId, ref, text, {
         ...(humanize !== undefined ? { humanize: humanize as boolean } : {}),
         ...(typeof wpm === "number" ? { wpm } : {}),
-        ...(clickTypeMode === "keys" || clickTypeMode === "insert" ? { mode: clickTypeMode } : {}),
+        ...(clickTypeMode === "keys" || clickTypeMode === "insert" || clickTypeMode === "rapid" ? { mode: clickTypeMode } : {}),
         ...(typeof submitKey === "string" ? { submitKey } : {}),
       });
     } catch (error: unknown) {

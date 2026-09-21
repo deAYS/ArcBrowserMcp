@@ -704,16 +704,20 @@ export function pressHoldMs(rng: HumanRng = Math.random): number {
 }
 
 /** Typing modes for humanized entry. */
-export type HumanTypeMode = "keys" | "insert";
+export type HumanTypeMode = "keys" | "insert" | "rapid";
 
 export const HUMAN_TYPE_MODE_DEFAULT: HumanTypeMode = "keys";
 
-/** Normalize an optional typing mode; defaults to keys (real key events). */
+/**
+ * Normalize an optional typing mode; defaults to keys (real key events).
+ * rapid emits the same real key events with zero pacing (no flight, no
+ * dwell) — the full key-event trail at machine speed.
+ */
 export function normalizeHumanTypeMode(raw: unknown): HumanTypeMode | null {
   if (raw === undefined) {
     return HUMAN_TYPE_MODE_DEFAULT;
   }
-  if (raw === "keys" || raw === "insert") {
+  if (raw === "keys" || raw === "insert" || raw === "rapid") {
     return raw;
   }
   return null;

@@ -119,7 +119,9 @@ export interface TypeHumanOptions {
   /**
    * keys (default): per-character real key events with lognormal
    * flight/dwell timing. insert: chunked insertText with the same rhythm
-   * model, faster but with no key-event trail. Passwords always use insert.
+   * model, faster but with no key-event trail. rapid: real key events
+   * with zero pacing (full event trail at machine speed). Passwords
+   * always use insert.
    */
   readonly mode?: HumanTypeMode;
 }

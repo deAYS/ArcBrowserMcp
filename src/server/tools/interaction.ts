@@ -104,12 +104,12 @@ export function registerInteractionTools(server: McpServer, services: Interactio
     {
       title: "Humanized type",
       description:
-        "Type text with biometric keystroke timing (lognormal flight/dwell, digraph speedups, thinking pauses). Mode keys (default) emits real per-character key events; insert uses paced CDP inserts. Use for humanized form entry; invalidates snapshot refs.",
+        "Type text with biometric keystroke timing (lognormal flight/dwell, digraph speedups, thinking pauses). Mode keys (default) emits real per-character key events; insert uses paced CDP inserts; rapid emits real key events with zero pacing. Use for humanized form entry; invalidates snapshot refs.",
       inputSchema: z.object({
         ref: z.string(),
         text: z.string(),
         wpm: z.number().int().min(20).max(200).optional(),
-        mode: z.enum(["keys", "insert"]).optional(),
+        mode: z.enum(["keys", "insert", "rapid"]).optional(),
       }),
       outputSchema: AcceptedSchema,
     },
@@ -147,13 +147,13 @@ export function registerInteractionTools(server: McpServer, services: Interactio
     {
       title: "Click then type",
       description:
-        "Real mouse click then type (optionally humanized) plus an optional submit key — login/search in one call. Humanize enables the neuromotor mouse path and keystroke pacing; mode selects keys (default, real key events) or insert. Invalidates snapshot refs.",
+        "Real mouse click then type (optionally humanized) plus an optional submit key — login/search in one call. Humanize enables the neuromotor mouse path and keystroke pacing; mode selects keys (default, real key events), insert, or rapid (real key events, zero pacing). Invalidates snapshot refs.",
       inputSchema: z.object({
         ref: z.string(),
         text: z.string(),
         humanize: z.boolean().optional(),
         wpm: z.number().int().min(20).max(200).optional(),
-        mode: z.enum(["keys", "insert"]).optional(),
+        mode: z.enum(["keys", "insert", "rapid"]).optional(),
         submitKey: z.string().optional(),
       }),
       outputSchema: AcceptedSchema,

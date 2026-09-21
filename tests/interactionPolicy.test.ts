@@ -120,6 +120,7 @@ describe("interaction policy", () => {
     expect(normalizeHumanTypeMode(undefined)).toBe("keys");
     expect(normalizeHumanTypeMode("keys")).toBe("keys");
     expect(normalizeHumanTypeMode("insert")).toBe("insert");
+    expect(normalizeHumanTypeMode("rapid")).toBe("rapid");
     expect(normalizeHumanTypeMode("fast")).toBeNull();
     expect(normalizeHumanTypeMode(42)).toBeNull();
     expect(HUMAN_KEYS_MODE_MAX_CHARS).toBe(1500);

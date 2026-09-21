@@ -218,8 +218,10 @@ describe("engine interaction selection gating", () => {
     expect(runtime.requests[1]?.payload).toMatchObject({ tabId: TAB_A, ref: REF, humanize: true });
     await engine.typeHuman(REF, "hello", { mode: "insert" });
     expect(runtime.requests[2]?.payload).toMatchObject({ mode: "insert" });
+    await engine.typeHuman(REF, "hello", { mode: "rapid" });
+    expect(runtime.requests[3]?.payload).toMatchObject({ mode: "rapid" });
     await engine.clickType(REF, "search", { mode: "insert" });
-    expect(runtime.requests[3]?.payload).toMatchObject({ mode: "insert" });
+    expect(runtime.requests[4]?.payload).toMatchObject({ mode: "insert" });
     const before = runtime.requests.length;
     expect(await catchCode(() => engine.click(REF, { humanize: "yes" as unknown as boolean }))).toBe(
       "BROWSER_INTERACTION_FAILED",

@@ -112,7 +112,7 @@ Point any stdio-capable MCP client at this command, for example with command `no
 | `browser_fill` | Replace an editable control's text with the supplied text (real keyboard/input mechanics, no script). Invalidates snapshot refs. |
 | `browser_type` | Insert text at the caret without clearing the field (real input mechanics, no script). Invalidates snapshot refs. |
 | `browser_press_key` | Dispatch a supported key/chord (Enter, Tab, Escape, Backspace, Delete, arrows, Home, End, PageUp, PageDown, Space, letters, digits, F1-F12, optional Control/Shift/Alt/Meta) to the selected tab. Invalidates snapshot refs. |
-| `browser_type_human` | Type with biometric keystroke timing (lognormal flight/dwell, digraph speedups). `keys` mode (default) emits real per-character key events; `insert` uses paced CDP inserts. Invalidates snapshot refs. |
+| `browser_type_human` | Type with biometric keystroke timing (lognormal flight/dwell, digraph speedups). `keys` mode (default) emits real per-character key events; `insert` uses paced CDP inserts; `rapid` emits real key events with zero pacing. Invalidates snapshot refs. |
 | `browser_press_sequence` | Press an ordered key sequence with inter-key delay in one call. Invalidates snapshot refs. |
 | `browser_click_type` | Real click then type (optionally humanized: neuromotor mouse path plus keystroke pacing) plus optional submit key in one call. Invalidates snapshot refs. |
 | `browser_get_text` | Fresh semantic Accessibility read of a live snapshot element ref. Read-only; password/protected values stay redacted. |

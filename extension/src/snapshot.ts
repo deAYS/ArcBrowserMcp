@@ -1412,9 +1412,9 @@ export class DebuggerSessionManager {
       throw new SnapshotError("INVALID_TEXT", "wpm is outside the 20-200 range");
     }
     if (normalizeHumanTypeMode(mode) === null) {
-      throw new SnapshotError("INVALID_TEXT", "mode must be keys or insert");
+      throw new SnapshotError("INVALID_TEXT", "mode must be keys, insert, or rapid");
     }
-    if (mode === "keys" && Array.from(text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
+    if ((mode === "keys" || mode === "rapid") && Array.from(text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
       throw new SnapshotError(
         "INVALID_TEXT",
         `keys mode accepts at most ${String(HUMAN_KEYS_MODE_MAX_CHARS)} characters`,
@@ -1460,8 +1460,10 @@ export class DebuggerSessionManager {
   /**
    * Shared keystroke engine for typeHuman/clickType. Keys mode emits real
    * per-character key events (keydown/dwell/keyup) with lognormal flight
-   * timing; insert mode replays the same rhythm model through chunked
-   * insertText (no key-event trail, but faster).
+   * timing; rapid mode emits the same real key events with zero pacing
+   * (no flight, no dwell) for maximum speed with a full event trail;
+   * insert mode replays the rhythm model through chunked insertText
+   * (no key-event trail, but faster than keys).
    */
   private async humanTypeText(
     chromeId: number,
@@ -1474,7 +1476,7 @@ export class DebuggerSessionManager {
   ): Promise<void> {
     const rng: HumanRng = Math.random;
     await this.interactionSend(chromeId, "DOM.focus", { backendNodeId });
-    if (mode !== "keys" || isPassword) {
+    if (mode !== "keys" && mode !== "rapid" || isPassword) {
       const chunks = planInsertChunks(text, wpm, rng);
       for (let index = 0; index < chunks.length; index += 1) {
         const chunk = chunks[index];
@@ -1488,10 +1490,13 @@ export class DebuggerSessionManager {
       }
       return;
     }
-    const keystrokes = planKeystrokes(text, wpm, rng);
+    const rapid = mode === "rapid";
+    const keystrokes = rapid ? Array.from(text).map((char) => ({ char, flightMs: 0, dwellMs: 0 })) : planKeystrokes(text, wpm, rng);
     let first = true;
     for (const entry of keystrokes) {
-      if (first) {
+      if (rapid) {
+        // No pacing whatsoever: back-to-back real key events.
+      } else if (first) {
         // Brief focus settle before the first key, never zero.
         await humanizeSleep(30 + rng() * 50);
         first = false;
@@ -1605,9 +1610,9 @@ export class DebuggerSessionManager {
     }
     const mode = normalizeHumanTypeMode(options?.mode);
     if (mode === null) {
-      throw new SnapshotError("INVALID_TEXT", "mode must be keys or insert");
+      throw new SnapshotError("INVALID_TEXT", "mode must be keys, insert, or rapid");
     }
-    if (humanize && mode === "keys" && Array.from(text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
+    if (humanize && (mode === "keys" || mode === "rapid") && Array.from(text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
       throw new SnapshotError(
         "INVALID_TEXT",
         `keys mode accepts at most ${String(HUMAN_KEYS_MODE_MAX_CHARS)} characters`,

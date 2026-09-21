@@ -481,8 +481,7 @@ describe("typeHuman", () => {
     expect(fixture.manager.isRefValid(PROJECT, textbox)).toBe(false);
   });
 
-  it("emits real key events with dwell in keys mode (the default)", async () => {
-    const fixture = harness();
+  it("emits real key events with dwell in keys mode (the default)", async () => {    const fixture = harness();
     const live = await refs(fixture);
     const textbox = live["Name"];
     if (textbox === undefined) {
@@ -497,6 +496,30 @@ describe("typeHuman", () => {
       true,
     );
     expect(fixture.commands.some((command) => command.method === "Input.insertText")).toBe(false);
+    expect(fixture.manager.isRefValid(PROJECT, textbox)).toBe(false);
+  });
+
+  it("emits bare key events with no pacing in rapid mode", async () => {
+    const fixture = harness();
+    const live = await refs(fixture);
+    const textbox = live["Name"];
+    if (textbox === undefined) {
+      throw new Error("expected a textbox ref");
+    }
+    await fixture.manager.typeHumanElement(PROJECT, textbox, "hey!", 200, "rapid");
+    const keys = fixture.commands.filter((command) => command.method === "Input.dispatchKeyEvent");
+    // h,e,y,! down/up each with zero pacing between them.
+    expect(keys.map((command) => command.params?.["type"])).toEqual([
+      "keyDown",
+      "keyUp",
+      "keyDown",
+      "keyUp",
+      "keyDown",
+      "keyUp",
+      "keyDown",
+      "keyUp",
+    ]);
+    expect(keys.map((command) => String(command.params?.["text"] ?? "")).join("")).toBe("hey!");
     expect(fixture.manager.isRefValid(PROJECT, textbox)).toBe(false);
   });
 
