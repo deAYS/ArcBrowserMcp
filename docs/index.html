@@ -29,8 +29,9 @@
 <nav class="tabs" role="tablist" aria-label="Site sections">
   <button role="tab" id="tabbtn-download" aria-controls="tab-download" aria-selected="true">Download</button>
   <button role="tab" id="tabbtn-install" aria-controls="tab-install" aria-selected="false">Install Guide</button>
+  <button role="tab" id="tabbtn-opencode" aria-controls="tab-opencode" aria-selected="false">OpenCode</button>
+  <button role="tab" id="tabbtn-claude" aria-controls="tab-claude" aria-selected="false">Claude</button>
   <button role="tab" id="tabbtn-contribute" aria-controls="tab-contribute" aria-selected="false">Contribute</button>
-  <button role="tab" id="tabbtn-access" aria-controls="tab-access" aria-selected="false">Tool Access</button>
 </nav>
 
 <main>
@@ -123,10 +124,26 @@ pnpm build:extension</code></pre>
       Report issues at <a href="https://github.com/deAYS/ArcBrowserMcp/issues">GitHub Issues</a>.</p>
   </section>
 
-  <section id="tab-access" role="tabpanel" aria-labelledby="tabbtn-access" hidden>
-    <h2>Tool Access</h2>
-    <p class="meta">The repo ships with all arc-mcp tools allowed. Tighten write actions to <code>ask</code> and keep reads on <code>allow</code>. Restart the client after changing config.</p>
-    <h3>OpenCode (<code>opencode.json</code>)</h3>
+  <section id="tab-opencode" role="tabpanel" aria-labelledby="tabbtn-opencode" hidden>
+    <h2>Using ArcBrowserMcp with OpenCode</h2>
+    <p class="meta">Prerequisite: the Install Guide steps are done once (extension loaded in Arc, native host registered, <code>pnpm build</code> current).</p>
+
+    <h3>1. Register the server</h3>
+    <p>OpenCode reads <code>.mcp.json</code> from the project root automatically (this repo ships one). For any other project, add the server to <code>opencode.json</code> with absolute paths:</p>
+    <pre><code>{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "arc-mcp": {
+      "type": "local",
+      "command": ["node", "&lt;absolute-path-to-repo&gt;\\dist\\index.js"],
+      "cwd": "&lt;absolute-path-to-repo&gt;",
+      "enabled": true,
+      "timeout": 60000
+    }
+  }
+}</code></pre>
+
+    <h3>2. Tool permissions</h3>
     <p>Tools are named <code>arc-mcp_&lt;tool&gt;</code>, e.g. <code>arc-mcp_browser_open_tab</code>. One wildcard covers all 20 <code>browser_*</code> tools:</p>
     <pre><code>{
   "$schema": "https://opencode.ai/config.json",
@@ -153,8 +170,41 @@ pnpm build:extension</code></pre>
   }
 }</code></pre>
     <p class="meta">Read-only: status, list_tabs, snapshot, get_text, screenshot, wait_for, console, network. State-changing: open/close/select tab, navigate, back, forward, reload, click, fill, type, press_key, evaluate.</p>
-    <h3>Claude Code (<code>.mcp.json</code> + permissions)</h3>
-    <p>Server registration lives in <code>.mcp.json</code> under <code>mcpServers.arc-mcp</code> — it carries no permissions. This mirrors the shipped OpenCode default (<code>arc-mcp_*</code> allow = all 20 tools); MCP tools are named <code>mcp__arc-mcp__&lt;tool&gt;</code>:</p>
+
+    <h3>3. Start and verify</h3>
+    <ol>
+      <li>Restart OpenCode after changing config (MCP servers are loaded at startup).</li>
+      <li>Run <code>/mcp</code> — <code>arc-mcp</code> should list as connected with the 20 <code>arc-mcp_browser_*</code> tools.</li>
+      <li>The sidecar <code>node dist/index.js</code> starts on first use; with the extension bridge up, <code>browser_status</code> reports <code>connected: true</code>.</li>
+    </ol>
+
+    <h3>4. Try it</h3>
+    <p>Example first prompt:</p>
+    <pre><code>Check the browser status, open https://www.google.com in a new tab,
+take a snapshot, and screenshot the page.</code></pre>
+    <p>Under the hood that maps to <code>browser_status</code> → <code>browser_open_tab</code> → <code>browser_snapshot</code> → <code>browser_screenshot</code>. Interactions come next: snapshot, then click/fill the returned element refs.</p>
+    <p class="meta">Multiple OpenCode sessions can share the same Arc at once — requests queue through one shared bridge connection; leaving a session leaves nothing to clean up.</p>
+  </section>
+
+  <section id="tab-claude" role="tabpanel" aria-labelledby="tabbtn-claude" hidden>
+    <h2>Using ArcBrowserMcp with Claude</h2>
+    <p class="meta">Prerequisite: the Install Guide steps are done once (extension loaded in Arc, native host registered, <code>pnpm build</code> current).</p>
+
+    <h3>1. Claude Code — register the server</h3>
+    <p>One command from any project (recommended):</p>
+    <pre><code>claude mcp add arc-mcp -- node "&lt;absolute-path-to-repo&gt;\dist\index.js"</code></pre>
+    <p>Or commit it for the team via <code>.mcp.json</code> at the project root (this repo ships one):</p>
+    <pre><code>{
+  "mcpServers": {
+    "arc-mcp": {
+      "command": "node",
+      "args": ["&lt;absolute-path-to-repo&gt;\\dist\\index.js"]
+    }
+  }
+}</code></pre>
+
+    <h3>2. Claude Code — permissions</h3>
+    <p>Put this in <code>.claude/settings.json</code> (or <code>.claude/settings.local.json</code> for just you):</p>
     <pre><code>{
   "permissions": {
     "allow": ["mcp__arc-mcp__*"],
@@ -163,6 +213,31 @@ pnpm build:extension</code></pre>
   }
 }</code></pre>
     <p class="meta">Allow rules need the literal <code>mcp__arc-mcp__</code> server prefix; a bare <code>mcp__*</code> allow is ignored. To tighten later, move write tools (e.g. <code>mcp__arc-mcp__browser_evaluate</code>) from <code>allow</code> to <code>ask</code>.</p>
+
+    <h3>3. Claude Desktop</h3>
+    <p>Edit <code>%APPDATA%\Claude\claude_desktop_config.json</code> and restart the app:</p>
+    <pre><code>{
+  "mcpServers": {
+    "arc-mcp": {
+      "command": "node",
+      "args": ["&lt;absolute-path-to-repo&gt;\\dist\\index.js"]
+    }
+  }
+}</code></pre>
+    <p class="meta">Claude Desktop has no per-tool permission file: it asks for approval the first time a tool is used each session.</p>
+
+    <h3>4. Start and verify</h3>
+    <ol>
+      <li>Restart Claude Code / the Desktop app after changing config.</li>
+      <li>In Claude Code, run <code>/mcp</code> — <code>arc-mcp</code> should show connected with 20 tools named <code>mcp__arc-mcp__browser_*</code>.</li>
+      <li>First useful check: ask for <code>browser_status</code>; with Arc and the bridge running it reports <code>connected: true</code>.</li>
+    </ol>
+
+    <h3>5. Try it</h3>
+    <p>Example first prompt:</p>
+    <pre><code>Check the browser status, open https://www.google.com in a new tab,
+take a snapshot, and click the search box.</code></pre>
+    <p>That maps to <code>browser_status</code> → <code>browser_open_tab</code> → <code>browser_snapshot</code> → <code>browser_click</code> on a returned ref.</p>
   </section>
 </main>
 
