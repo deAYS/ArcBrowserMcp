@@ -288,13 +288,23 @@ function analyzeMouse(events) {
     fitts = { a: clamp(reg.intercept, 0, 400), b: clamp(reg.slope, 40, 300), r2: reg.r2, n: regSet.length };
   }
 
-  // Tremor: residual RMS after a 5-sample moving average on long segments.
+  // Tremor: residual RMS after a 5-sample moving average, restricted to
+  // clean ballistic moves (efficiency >= 0.85) so direction reversals and
+  // reading-scrub don't masquerade as hand tremor.
   const tremors = [];
   for (const seg of segments) {
     const pts = seg.points;
     if (pts.length < 10) continue;
     const dur = pts[pts.length - 1].t - pts[0].t;
     if (dur < 150) continue;
+    const a0 = pts[0];
+    const b0 = pts[pts.length - 1];
+    const segD = Math.hypot(b0.x - a0.x, b0.y - a0.y);
+    let path = 0;
+    for (let i = 1; i < pts.length; i += 1) {
+      path += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    }
+    if (segD / Math.max(path, 0.001) < 0.85) continue;
     let ss = 0;
     let n = 0;
     for (let i = 2; i < pts.length - 2; i += 1) {
@@ -323,10 +333,13 @@ function analyzeMouse(events) {
   const corrections = [];
   for (const s of usable) {
     if (s.click === null) continue;
-    if (s.D < 60 && s.click.t - s.points[s.points.length - 1].t < 300) corrections.push(s.D);
+    if (s.D < 60 && s.click.t - s.lastMoveT < 300) corrections.push(s.D);
   }
 
-  const curv = usable.map((s) => s.curvature).sort((a, b) => a - b);
+  const curv = usable
+    .filter((s) => s.efficiency >= 0.7)
+    .map((s) => s.curvature)
+    .sort((a, b) => a - b);
   const eff = usable.map((s) => s.efficiency).sort((a, b) => a - b);
   return {
     nSegments: usable.length,
@@ -432,13 +445,15 @@ function buildProfile(kb, mouse) {
   P.thinkingPauseFloorMs = 200;
   P.thinkingPauseCapMs = 1500;
 
-  if (mouse.fitts !== null) {
+  if (mouse.fitts !== null && mouse.fitts.r2 >= 0.3) {
     P.fittsAMs = roundInt(mouse.fitts.a);
     P.fittsBMs = roundInt(mouse.fitts.b);
   } else {
     P.fittsAMs = 100;
     P.fittsBMs = 120;
-    warnings.push("fittsAMs/fittsBMs: insufficient data, kept defaults");
+    warnings.push(
+      `fittsAMs/fittsBMs: insufficient data${mouse.fitts !== null ? ` (R2=${mouse.fitts.r2.toFixed(2)} < 0.30)` : ""}, kept defaults`,
+    );
   }
   P.curveMinFraction = round2(clamp(Number.isFinite(mouse.curvatureP10) ? mouse.curvatureP10 : 0.06, 0.0, 0.2));
   P.curveMaxFraction = round2(clamp(Number.isFinite(mouse.curvatureP90) ? mouse.curvatureP90 : 0.3, 0.1, 0.5));
@@ -449,8 +464,15 @@ function buildProfile(kb, mouse) {
     if (mouse.nSegments >= MIN_SEGMENTS) warnings.push("overshootSigmaPx: no corrections observed, kept default");
   }
   P.overshootMinDistPx = 250;
-  P.tremorAmpPx = Number.isFinite(mouse.tremorRms) ? round2(clamp(mouse.tremorRms, 0.2, 2.0)) : 0.9;
-  if (!Number.isFinite(mouse.tremorRms)) warnings.push("tremorAmpPx: insufficient data, kept default");
+  // Tremor is not fitted: 8 ms poll quantization + timer coalescing inflate
+  // the residual far beyond hand tremor (measured 8+ px RMS on real data).
+  // The literature 0.9 px stands until a high-resolution source exists.
+  P.tremorAmpPx = 0.9;
+  if (Number.isFinite(mouse.tremorRms)) {
+    warnings.push(
+      `tremorAmpPx: poll data cannot resolve hand tremor (measured RMS ${mouse.tremorRms.toFixed(2)} px is timer noise), kept default`,
+    );
+  }
   P.tremorFreqMinHz = 8;
   P.tremorFreqMaxHz = 12;
   if (mouse.hover !== null) {

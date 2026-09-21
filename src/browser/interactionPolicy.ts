@@ -152,43 +152,33 @@ export const CLICK_TYPE_SUBMIT_MAX_KEYS = 1;
  * Bezier + Fitts + overshoot + submovements + tremor (see planMouseMove).
  */
 export const HUMAN_PROFILE = {
-  /** Shannon Fitts intercept/slope for movement time (ms, ms/bit). */
   fittsAMs: 100,
   fittsBMs: 120,
-  /** Lateral Bezier deviation as a fraction of distance (one-sided). */
-  curveMinFraction: 0.06,
-  curveMaxFraction: 0.3,
-  /** Half-normal overshoot scale (px) applied past this distance (px). */
-  overshootSigmaPx: 12,
+  curveMinFraction: 0.04,
+  curveMaxFraction: 0.25,
+  overshootSigmaPx: 23.3,
   overshootMinDistPx: 250,
-  /** Sinusoidal hand tremor: amplitude (px) and frequency band (Hz). */
   tremorAmpPx: 0.9,
   tremorFreqMinHz: 8,
   tremorFreqMaxHz: 12,
-  /** Pre-click hover dwell (ms). */
-  hoverMedianMs: 120,
-  hoverSigma: 0.55,
+  hoverMedianMs: 94,
+  hoverSigma: 0.78,
   hoverFloorMs: 40,
   hoverCapMs: 500,
-  /** Mouse-button hold time (ms). */
   holdMedianMs: 75,
   holdSigma: 0.5,
   holdFloorMs: 30,
   holdCapMs: 300,
-  /** Inter-key flight time: shape + hard floor/cap (ms). Median comes from WPM. */
-  ikiSigma: 0.45,
-  ikiFloorMs: 60,
-  ikiCapMs: 2000,
-  /** Key hold (dwell) time (ms). */
-  dwellMedianMs: 85,
-  dwellSigma: 0.35,
+  ikiSigma: 0.65,
+  ikiFloorMs: 39,
+  ikiCapMs: 1057,
+  dwellMedianMs: 55,
+  dwellSigma: 0.43,
   dwellFloorMs: 40,
   dwellCapMs: 180,
-  /** Multiplier for frequent digraphs (0.72 = 28% faster). */
   digraphSpeedup: 0.72,
-  /** Extra pause after space / sentence punctuation / newline (ms). */
-  wordPauseMedianMs: 120,
-  wordPauseSigma: 0.6,
+  wordPauseMedianMs: 208,
+  wordPauseSigma: 0.69,
   wordPauseCapMs: 800,
   sentencePauseMedianMs: 350,
   sentencePauseSigma: 0.7,
@@ -198,15 +188,12 @@ export const HUMAN_PROFILE = {
   newlinePauseSigma: 0.6,
   newlinePauseFloorMs: 80,
   newlinePauseCapMs: 1000,
-  /** Occasional thinking pause: probability per keystroke + shape (ms). */
   thinkingProb: 0.04,
-  thinkingPauseMedianMs: 500,
+  thinkingPauseMedianMs: 974,
   thinkingPauseSigma: 0.6,
   thinkingPauseFloorMs: 200,
   thinkingPauseCapMs: 1500,
-  /** Click-point jitter as a fraction of the element half-size. */
   clickJitterFraction: 0.18,
-  /** Measured natural typing rate; --apply also adopts it as WPM default. */
   naturalWpm: 80,
 } as const;
 // END HUMAN PROFILE

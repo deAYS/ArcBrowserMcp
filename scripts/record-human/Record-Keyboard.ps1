@@ -156,7 +156,7 @@ public sealed class KeyProbe {
 }
 "@
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot ".." "..")
+$repoRoot = Resolve-Path (Join-Path (Join-Path $PSScriptRoot "..") "..")
 $recordDir = Join-Path $repoRoot "recordings"
 New-Item -ItemType Directory -Path $recordDir -Force | Out-Null
 if ([string]::IsNullOrWhiteSpace($OutFile)) {
