@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { BridgeError } from "./BridgeError.js";
+import type { BridgeErrorCode } from "./BridgeError.js";
 import type { BridgeMessage, BridgeRequest } from "./protocol.js";
 import { errorResponse, parseBridgeMessage } from "./protocol.js";
 
@@ -14,6 +15,32 @@ export interface RpcPeerOptions {
 }
 
 const DEFAULT_RPC_TIMEOUT_MS = 15_000;
+
+const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set<string>([
+  "INVALID_ENVELOPE",
+  "UNSUPPORTED_VERSION",
+  "UNKNOWN_METHOD",
+  "NOT_AUTHENTICATED",
+  "NOT_CONNECTED",
+  "TIMEOUT",
+  "PIPE_BUSY",
+  "SESSION_MISSING",
+  "SESSION_STALE",
+  "SESSION_CORRUPT",
+  "ORIGIN_REJECTED",
+  "NATIVE_FRAME_TOO_LARGE",
+  "NATIVE_FRAME_MALFORMED",
+  "NATIVE_FRAME_INCOMPLETE",
+  "REGISTRY_ERROR",
+  "HOST_STARTUP_FAILED",
+  "EXTENSION_CONNECT_TIMEOUT",
+  "BRIDGE_PREFLIGHT_FAILED",
+]);
+
+/** True when a code is a project-owned bridge error code (safe to rethrow). */
+export function isKnownBridgeErrorCode(code: string): boolean {
+  return KNOWN_ERROR_CODES.has(code);
+}
 
 function defaultGenerateId(): string {
   return randomBytes(8).toString("hex");
@@ -101,10 +128,19 @@ export class RpcPeer {
       if (message.ok) {
         pending.resolve(message.payload);
       } else {
-        pending.reject(new BridgeError("INVALID_ENVELOPE", `remote error ${message.error.code}: ${message.error.message}`, {
-          id: message.id,
-          remoteCode: message.error.code,
-        }));
+        // Preserve typed codes across hops: a known transport/protocol code
+        // becomes the rejection code itself (TIMEOUT must stay TIMEOUT for
+        // callers that retry on it); extension-side codes stay reachable via
+        // details.remoteCode. Response details pass through so typed
+        // metadata survives proxy chains.
+        const remoteCode = message.error.code;
+        pending.reject(
+          new BridgeError(
+            KNOWN_ERROR_CODES.has(remoteCode) ? (remoteCode as BridgeErrorCode) : "INVALID_ENVELOPE",
+            `remote error ${remoteCode}: ${message.error.message}`,
+            { ...message.error.details, id: message.id, remoteCode },
+          ),
+        );
       }
       return;
     }
@@ -129,7 +165,8 @@ export class RpcPeer {
       },
       (error: unknown) => {
         const code = error instanceof BridgeError ? error.code : "UNKNOWN_METHOD";
-        this.sendRaw(errorResponse(message.id, code, error instanceof Error ? error.message : String(error)));
+        const details = error instanceof BridgeError ? error.details : {};
+        this.sendRaw(errorResponse(message.id, code, error instanceof Error ? error.message : String(error), details));
       },
     );
   }

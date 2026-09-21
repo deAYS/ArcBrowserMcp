@@ -45,7 +45,12 @@ export interface BridgeResponseError {
   readonly id: string;
   readonly type: "response";
   readonly ok: false;
-  readonly error: { readonly code: string; readonly message: string };
+  readonly error: {
+    readonly code: string;
+    readonly message: string;
+    /** Optional bounded metadata (e.g. remoteCode) preserved across proxy hops. */
+    readonly details?: Readonly<Record<string, string>>;
+  };
 }
 
 export type BridgeResponse = BridgeResponseOk | BridgeResponseError;
@@ -118,7 +123,23 @@ export function parseBridgeMessage(value: unknown): BridgeMessage {
       if (!isRecord(error) || typeof error["code"] !== "string" || typeof error["message"] !== "string") {
         throw new BridgeError("INVALID_ENVELOPE", "bridge error-response needs {code, message} strings");
       }
-      return { version: 1, id, type, ok: false, error: { code: error["code"], message: error["message"] } };
+      let details: Record<string, string> | undefined;
+      if (error["details"] !== undefined) {
+        const raw = error["details"];
+        if (!isRecord(raw)) {
+          throw new BridgeError("INVALID_ENVELOPE", "bridge error-response details must be an object");
+        }
+        details = {};
+        for (const [key, entry] of Object.entries(raw)) {
+          if (typeof entry !== "string") {
+            throw new BridgeError("INVALID_ENVELOPE", "bridge error-response details must hold string values");
+          }
+          details[key] = entry;
+        }
+      }
+      return details === undefined
+        ? { version: 1, id, type, ok: false, error: { code: error["code"], message: error["message"] } }
+        : { version: 1, id, type, ok: false, error: { code: error["code"], message: error["message"], details } };
     }
     throw new BridgeError("INVALID_ENVELOPE", "bridge response ok must be boolean true/false");
   }
@@ -128,6 +149,13 @@ export function parseBridgeMessage(value: unknown): BridgeMessage {
   );
 }
 
-export function errorResponse(id: string, code: string, message: string): BridgeResponseError {
-  return { version: 1, id, type: "response", ok: false, error: { code, message } };
+export function errorResponse(
+  id: string,
+  code: string,
+  message: string,
+  details?: Readonly<Record<string, string>>,
+): BridgeResponseError {
+  return details === undefined || Object.keys(details).length === 0
+    ? { version: 1, id, type: "response", ok: false, error: { code, message } }
+    : { version: 1, id, type: "response", ok: false, error: { code, message, details } };
 }

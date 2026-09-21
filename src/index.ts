@@ -27,13 +27,35 @@ async function main(): Promise<void> {
   // Assigned once the stdio server exists; the orphan watchdog above can
   // only fire after engine.connect(), so the no-op default is never used.
   let shutdown: (signal: string) => void = () => undefined;
+  // Stdin EOF means the MCP client closed its side: without this the
+  // process would linger as a stale pipe owner (GUI closed or workspace
+  // switched). Deferred while proxy clients still join this owner.
+  let stdinEnded = false;
+  let reapDeferred = false;
+  const onStdinGone = (): void => {
+    stdinEnded = true;
+    if (runtime.proxyClientCount() === 0) {
+      shutdown("STDIN_EOF");
+    } else {
+      reapDeferred = true;
+    }
+  };
+  const maybeReap = (): void => {
+    if (reapDeferred && runtime.proxyClientCount() === 0) {
+      reapDeferred = false;
+      shutdown("STDIN_EOF");
+    }
+  };
   const runtime = new BridgeRuntime({
     logger,
     // Reap orphans: if opencode dies without reaping its MCP child, the
     // child would otherwise hold the pipe forever (PIPE_BUSY for every
     // later session). Assigned below; no-op until startup completes.
     onOrphaned: () => shutdown("PARENT_LOST"),
+    onClientsIdle: () => maybeReap(),
   });
+  process.stdin.on("end", onStdinGone);
+  process.stdin.on("close", onStdinGone);
   const engine = new ArcExtensionEngine({
     runtime,
     extensionId: identity.extensionId,
@@ -67,6 +89,10 @@ async function main(): Promise<void> {
   shutdown = createShutdownHandler(handle, logger, () => engine.disconnect());
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
+  // Replay an EOF that fired before the shutdown handler existed.
+  if (stdinEnded && runtime.proxyClientCount() === 0) {
+    onStdinGone();
+  }
 }
 
 main().then(
