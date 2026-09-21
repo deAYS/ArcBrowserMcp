@@ -497,8 +497,12 @@ bridge.onRemoteRequest(async (method, payload, _id) => {
     if (ref === undefined) {
       throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.click requires ref");
     }
+    const humanize = payload["humanize"];
+    if (humanize !== undefined && typeof humanize !== "boolean") {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.click field humanize must be a boolean");
+    }
     try {
-      return await snapshotManager.clickElement(tabId, ref);
+      return await snapshotManager.clickElement(tabId, ref, humanize === true);
     } catch (error: unknown) {
       throw toBridgeSnapshotError(error);
     }
@@ -558,8 +562,18 @@ bridge.onRemoteRequest(async (method, payload, _id) => {
     if (wpm !== undefined && (typeof wpm !== "number" || !Number.isInteger(wpm))) {
       throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.typeHuman field wpm must be an integer");
     }
+    const mode = payload["mode"];
+    if (mode !== undefined && mode !== "keys" && mode !== "insert") {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.typeHuman field mode must be keys or insert");
+    }
     try {
-      return await snapshotManager.typeHumanElement(tabId, ref, text, typeof wpm === "number" ? wpm : undefined);
+      return await snapshotManager.typeHumanElement(
+        tabId,
+        ref,
+        text,
+        typeof wpm === "number" ? wpm : undefined,
+        mode === "insert" ? "insert" : "keys",
+      );
     } catch (error: unknown) {
       throw toBridgeSnapshotError(error);
     }
@@ -608,6 +622,10 @@ bridge.onRemoteRequest(async (method, payload, _id) => {
     if (wpm !== undefined && (typeof wpm !== "number" || !Number.isInteger(wpm))) {
       throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType field wpm must be an integer");
     }
+    const clickTypeMode = payload["mode"];
+    if (clickTypeMode !== undefined && clickTypeMode !== "keys" && clickTypeMode !== "insert") {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType field mode must be keys or insert");
+    }
     const submitKey = payload["submitKey"];
     if (submitKey !== undefined && typeof submitKey !== "string") {
       throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType field submitKey must be a string");
@@ -616,6 +634,7 @@ bridge.onRemoteRequest(async (method, payload, _id) => {
       return await snapshotManager.clickTypeElement(tabId, ref, text, {
         ...(humanize !== undefined ? { humanize: humanize as boolean } : {}),
         ...(typeof wpm === "number" ? { wpm } : {}),
+        ...(clickTypeMode === "keys" || clickTypeMode === "insert" ? { mode: clickTypeMode } : {}),
         ...(typeof submitKey === "string" ? { submitKey } : {}),
       });
     } catch (error: unknown) {

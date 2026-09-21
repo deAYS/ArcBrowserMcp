@@ -254,6 +254,35 @@ describe("click", () => {
     });
     expect(fixture.commands.some((command) => command.method === "Input.dispatchMouseEvent")).toBe(false);
   });
+
+  it("replays a neuromotor path with hover and hold when humanized", async () => {
+    const fixture = harness();
+    const live = await refs(fixture);
+    const button = live["Submit"];
+    if (button === undefined) {
+      throw new Error("expected a button ref");
+    }
+    const result = await fixture.manager.clickElement(PROJECT, button, true);
+    expect(result).toEqual({ clicked: true });
+    const mouse = fixture.commands.filter((command) => command.method === "Input.dispatchMouseEvent");
+    const types = mouse.map((command) => command.params?.["type"]);
+    // Many moved waypoints, then exactly one press/release pair.
+    expect(types.filter((type) => type === "mouseMoved").length).toBeGreaterThan(3);
+    expect(types.slice(-2)).toEqual(["mousePressed", "mouseReleased"]);
+    // Integer coordinates only; press lands inside the 100x20 fixture box.
+    for (const command of mouse) {
+      expect(Number.isInteger(command.params?.["x"])).toBe(true);
+      expect(Number.isInteger(command.params?.["y"])).toBe(true);
+    }
+    const pressed = mouse.find((command) => command.params?.["type"] === "mousePressed");
+    const px = Number(pressed?.params?.["x"]);
+    const py = Number(pressed?.params?.["y"]);
+    expect(px).toBeGreaterThanOrEqual(0);
+    expect(px).toBeLessThanOrEqual(100);
+    expect(py).toBeGreaterThanOrEqual(0);
+    expect(py).toBeLessThanOrEqual(20);
+    expect(fixture.manager.isRefValid(PROJECT, button)).toBe(false);
+  });
 });
 
 describe("fill", () => {
@@ -438,21 +467,56 @@ describe("pressKey", () => {
 });
 
 describe("typeHuman", () => {
-  it("chunks inserts with pacing and invalidates refs", async () => {
+  it("inserts in chunks with pacing in insert mode and invalidates refs", async () => {
     const fixture = harness();
     const live = await refs(fixture);
     const textbox = live["Name"];
     if (textbox === undefined) {
       throw new Error("expected a textbox ref");
     }
-    await fixture.manager.typeHumanElement(PROJECT, textbox, "hello world", 200);
+    await fixture.manager.typeHumanElement(PROJECT, textbox, "hello world", 200, "insert");
     const inserts = fixture.commands.filter((command) => command.method === "Input.insertText");
     expect(inserts.length).toBeGreaterThan(1);
     expect(inserts.map((entry) => String(entry.params?.["text"])).join("")).toBe("hello world");
     expect(fixture.manager.isRefValid(PROJECT, textbox)).toBe(false);
   });
 
-  it("rejects bad wpm, non-editable, and oversized text", async () => {
+  it("emits real key events with dwell in keys mode (the default)", async () => {
+    const fixture = harness();
+    const live = await refs(fixture);
+    const textbox = live["Name"];
+    if (textbox === undefined) {
+      throw new Error("expected a textbox ref");
+    }
+    await fixture.manager.typeHumanElement(PROJECT, textbox, "hi", 200);
+    const keys = fixture.commands.filter((command) => command.method === "Input.dispatchKeyEvent");
+    expect(keys.map((command) => command.params?.["type"])).toEqual(["keyDown", "keyUp", "keyDown", "keyUp"]);
+    // Text rides on keyDown (keyUp carries none); joined it spells the input.
+    expect(keys.map((command) => String(command.params?.["text"] ?? "")).join("")).toBe("hi");
+    expect(keys.every((command) => command.params?.["code"] === "KeyH" || command.params?.["code"] === "KeyI")).toBe(
+      true,
+    );
+    expect(fixture.commands.some((command) => command.method === "Input.insertText")).toBe(false);
+    expect(fixture.manager.isRefValid(PROJECT, textbox)).toBe(false);
+  });
+
+  it("forces insert mode for password fields even when keys is requested", async () => {
+    const fixture = harness();
+    const live = await refs(fixture);
+    const password = live["Password"];
+    if (password === undefined) {
+      throw new Error("expected a password ref");
+    }
+    await fixture.manager.typeHumanElement(PROJECT, password, "s3cret", 200, "keys");
+    const inserts = fixture.commands.filter((command) => command.method === "Input.insertText");
+    expect(inserts.map((entry) => String(entry.params?.["text"])).join("")).toBe("s3cret");
+    const keyTexts = fixture.commands
+      .filter((command) => command.method === "Input.dispatchKeyEvent")
+      .map((command) => String(command.params?.["text"] ?? ""));
+    expect(keyTexts.join("")).toBe("");
+  });
+
+  it("rejects bad wpm, bad mode, keys budget overflow, non-editable, and oversized text", async () => {
     const fixture = harness();
     const live = await refs(fixture);
     const textbox = live["Name"];
@@ -462,6 +526,12 @@ describe("typeHuman", () => {
     await expect(fixture.manager.typeHumanElement(PROJECT, textbox, "hi", 5)).rejects.toMatchObject({
       code: "INVALID_TEXT",
     });
+    await expect(
+      fixture.manager.typeHumanElement(PROJECT, textbox, "hi", 80, "fast" as unknown as "keys"),
+    ).rejects.toMatchObject({ code: "INVALID_TEXT" });
+    await expect(
+      fixture.manager.typeHumanElement(PROJECT, textbox, "x".repeat(1501), 80, "keys"),
+    ).rejects.toMatchObject({ code: "INVALID_TEXT" });
     await expect(
       fixture.manager.typeHumanElement(PROJECT, textbox, "x".repeat(INTERACTION_TEXT_LIMIT_BYTES + 1)),
     ).rejects.toMatchObject({ code: "INVALID_TEXT" });
@@ -531,6 +601,44 @@ describe("clickType", () => {
     await expect(
       fixture.manager.clickTypeElement(PROJECT, textbox, "hi", { submitKey: "Super+Enter" }),
     ).rejects.toMatchObject({ code: "INVALID_KEY" });
+  });
+
+  it("humanizes mouse and keystrokes by default and honors insert mode", async () => {
+    const fixture = harness();
+    const live = await refs(fixture);
+    const textbox = live["Name"];
+    if (textbox === undefined) {
+      throw new Error("expected a textbox ref");
+    }
+    await fixture.manager.clickTypeElement(PROJECT, textbox, "hi", { wpm: 200, submitKey: "Enter" });
+    const mouse = fixture.commands.filter((command) => command.method === "Input.dispatchMouseEvent");
+    expect(mouse.filter((command) => command.params?.["type"] === "mouseMoved").length).toBeGreaterThan(3);
+    const keys = fixture.commands.filter((command) => command.method === "Input.dispatchKeyEvent");
+    // h, i (down/up each) + Enter submit (down/up).
+    expect(keys.map((command) => command.params?.["type"])).toEqual([
+      "keyDown",
+      "keyUp",
+      "keyDown",
+      "keyUp",
+      "keyDown",
+      "keyUp",
+    ]);
+    expect(fixture.manager.isRefValid(PROJECT, textbox)).toBe(false);
+
+    const insert = harness();
+    const insertRefs = await refs(insert);
+    const insertBox = insertRefs["Name"];
+    if (insertBox === undefined) {
+      throw new Error("expected a textbox ref");
+    }
+    await insert.manager.clickTypeElement(PROJECT, insertBox, "hi", { wpm: 200, mode: "insert" });
+    expect(insert.commands.some((command) => command.method === "Input.insertText")).toBe(true);
+    const insertKeys = insert.commands.filter((command) => command.method === "Input.dispatchKeyEvent");
+    expect(insertKeys.map((command) => String(command.params?.["text"] ?? "")).join("")).toBe("");
+
+    await expect(
+      insert.manager.clickTypeElement(PROJECT, insertBox, "hi", { mode: "nope" as unknown as "keys" }),
+    ).rejects.toMatchObject({ code: "INVALID_TEXT" });
   });
 });
 

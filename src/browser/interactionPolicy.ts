@@ -9,6 +9,14 @@
  * - humanized composite defaults: WPM range, per-key delay range, sequence
  *   caps, and deterministic chunk/delay helpers so Node gates and the
  *   extension compute identical timing without extra RPC.
+ * - neuromotor humanization generators (mouse trajectories, keystroke
+ *   timing): extension-safe math with an injectable RNG. Production passes
+ *   Math.random; tests inject a seeded stub for determinism. Uniform
+ *   randomness is itself a bot tell, so every timing sample here is
+ *   heavy-tailed (lognormal) and every trajectory carries structured
+ *   human noise (Bezier arc + Fitts timing + overshoot + corrective
+ *   submovements + hand tremor), matching published mouse/keystroke
+ *   biometric research rather than naive jitter.
  * - redactedLength helper so length-gated errors never echo secret payload.
  */
 
@@ -321,3 +329,319 @@ export function humanizeChunkDelayMs(wpm: number, chunkIndex: number, chunk: str
   }
   return delay;
 }
+
+/** Injectable randomness: production passes Math.random, tests a seeded stub. */
+export type HumanRng = () => number;
+
+/** Standard normal sample via Box-Muller (two uniform draws, stateless). */
+export function gauss01(rng: HumanRng = Math.random): number {
+  let u1 = rng();
+  // Guard the log domain: a zero draw would produce +Infinity.
+  if (u1 <= 0) {
+    u1 = Number.MIN_VALUE;
+  }
+  const u2 = rng();
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+/**
+ * Lognormal sample with a median and shape, clamped to [min, max].
+ * Human motor timing is heavy-tailed (lognormal/log-logistic in the
+ * keystroke literature), so this replaces uniform jitter everywhere.
+ */
+export function sampleLognormal(
+  median: number,
+  sigma: number,
+  min: number,
+  max: number,
+  rng: HumanRng = Math.random,
+): number {
+  const sample = median * Math.exp(sigma * gauss01(rng));
+  if (!Number.isFinite(sample)) {
+    return Math.min(Math.max(median, min), max);
+  }
+  return Math.min(Math.max(sample, min), max);
+}
+
+/** Median inter-key flight time for a WPM rate (5 chars/word). */
+export function wpmToMedianIkiMs(wpm: number): number {
+  const safe = Number.isInteger(wpm) && wpm >= HUMANIZE_WPM_MIN && wpm <= HUMANIZE_WPM_MAX ? wpm : HUMANIZE_WPM_DEFAULT;
+  return 60_000 / safe / 5;
+}
+
+/**
+ * Frequent English digraphs typed materially faster than average
+ * (common pairs and different-hand alternation run 20-30% quicker).
+ * Lookup is lowercase; both characters must be ASCII letters.
+ */
+const FAST_DIGRAPHS = new Set(
+  "th he in er an re on at en nd ti es or te of ed is it al ar st to nt ng se ha as ou io le ve co me de hi ri ro ic ne ea ra ce li ch ll be ma si om ur wh ec ot ew gh et fr ow ai rl ss tt oo lf mm".split(" "),
+);
+
+const DIGRAPH_SPEEDUP = 0.72;
+
+/** True for ASCII letters (digraph/dwell fast paths only apply to these). */
+function isAsciiletter(char: string): boolean {
+  return char.length === 1 && ((char >= "a" && char <= "z") || (char >= "A" && char <= "Z"));
+}
+
+export interface KeystrokePlanEntry {
+  /** Single code point to emit. */
+  readonly char: string;
+  /** Flight time since the previous key release (ms, >= 0). */
+  readonly flightMs: number;
+  /** Hold (dwell) time for this key (ms, >= 0). */
+  readonly dwellMs: number;
+}
+
+/**
+ * Per-character keystroke plan with biometric timing: lognormal flight
+ * times around the WPM median (60ms floor from the typing literature),
+ * digraph speedups, word/sentence/thinking pauses, and lognormal dwell.
+ * Code-point iteration keeps surrogate pairs (emoji) intact as one entry.
+ */
+export function planKeystrokes(text: string, wpm: number, rng: HumanRng = Math.random): KeystrokePlanEntry[] {
+  const median = wpmToMedianIkiMs(wpm);
+  const chars = Array.from(text);
+  const plan: KeystrokePlanEntry[] = [];
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index] ?? "";
+    const prev = index === 0 ? "" : (chars[index - 1] ?? "");
+    let flight = sampleLognormal(median, 0.45, 60, 2000, rng);
+    if (prev !== "" && isAsciiletter(prev) && isAsciiletter(char)) {
+      const pair = `${prev.toLowerCase()}${char.toLowerCase()}`;
+      if (FAST_DIGRAPHS.has(pair)) {
+        flight *= DIGRAPH_SPEEDUP;
+      }
+    }
+    if (prev === " ") {
+      flight += sampleLognormal(120, 0.6, 0, 800, rng);
+    }
+    if (prev === "." || prev === "!" || prev === "?") {
+      flight += sampleLognormal(350, 0.7, 100, 1500, rng);
+    }
+    if (prev === "\n") {
+      flight += sampleLognormal(250, 0.6, 80, 1000, rng);
+    }
+    if (index > 0 && rng() < 0.04) {
+      flight += sampleLognormal(500, 0.6, 200, 1500, rng);
+    }
+    const dwell = sampleLognormal(85, 0.35, 40, 180, rng);
+    plan.push({ char, flightMs: Math.round(Math.min(flight, 4000)), dwellMs: Math.round(dwell) });
+  }
+  return plan;
+}
+
+export interface InsertChunkPlan {
+  /** 1-4 code points inserted in one CDP call. */
+  readonly text: string;
+  /** Sleep after this chunk (ms); 0 after the final chunk. */
+  readonly delayMs: number;
+}
+
+/**
+ * Group a keystroke plan into insertText chunks: the chunk boundary
+ * carries the accumulated flight timing so insert mode keeps the same
+ * rhythm model as keys mode (dwell is not observable via insertText
+ * and is therefore dropped here).
+ */
+export function planInsertChunks(
+  text: string,
+  wpm: number,
+  rng: HumanRng = Math.random,
+): InsertChunkPlan[] {
+  const keystrokes = planKeystrokes(text, wpm, rng);
+  const chunks: InsertChunkPlan[] = [];
+  let index = 0;
+  while (index < keystrokes.length) {
+    const size = 1 + Math.floor(rng() * 4);
+    const slice = keystrokes.slice(index, index + size);
+    const chars = slice.map((entry) => entry.char).join("");
+    const trailing = keystrokes[index + slice.length];
+    const delay = trailing === undefined ? 0 : slice.reduce((sum, entry) => sum + entry.flightMs, 0) + trailing.flightMs;
+    chunks.push({ text: chars, delayMs: Math.min(Math.round(delay), 4000) });
+    index += slice.length;
+  }
+  return chunks;
+}
+
+/** 2D point in CSS pixels (viewport coordinates for CDP mouse events). */
+export interface MousePoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** Timed waypoint: cursor position plus sleep-after calories in ms. */
+export interface MouseWaypoint extends MousePoint {
+  readonly dtMs: number;
+}
+
+export interface MouseMovePlan {
+  readonly points: readonly MouseWaypoint[];
+  /** Total replay duration in ms (sum of dtMs). */
+  readonly durationMs: number;
+}
+
+/** Bounds for the humanized mouse path (one click -> many mouseMoved). */
+export const MOUSE_FITTS_A_MS = 100;
+export const MOUSE_FITTS_B_MS = 120;
+export const MOUSE_MIN_MOVE_MS = 120;
+export const MOUSE_MAX_MOVE_MS = 2000;
+export const MOUSE_MAX_TOTAL_MS = 2500;
+export const MOUSE_SAMPLE_INTERVAL_MS = 8;
+export const MOUSE_MAX_STEPS = 250;
+export const MOUSE_OVERSHOOT_DISTANCE_PX = 250;
+export const MOUSE_OVERSHOOT_SIGMA_PX = 12;
+export const MOUSE_TREMOR_AMPLITUDE_PX = 0.9;
+export const MOUSE_CLICK_JITTER_FRACTION = 0.18;
+
+function cubicBezier(p0: number, p1: number, p2: number, p3: number, t: number): number {
+  const u = 1 - t;
+  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
+}
+
+/** Raised-cosine position profile: zero velocity at both ends, peak mid-flight. */
+function raisedCosine(t: number): number {
+  return t - Math.sin(2 * Math.PI * t) / (2 * Math.PI);
+}
+
+/**
+ * Neuromotor mouse trajectory: Shannon Fitts-law timing, cubic Bezier arc
+ * (one-sided lateral deviation, never a perfect center line), half-normal
+ * overshoot on long moves, 0-3 corrective submovements, and sinusoidal
+ * hand tremor — replayed at ~120Hz. All shape parameters are resampled per
+ * call so repeated moves never share one fingerprintable distribution.
+ * The final point lands exactly on `to`.
+ */
+export function planMouseMove(
+  from: MousePoint,
+  to: MousePoint,
+  targetWidthPx: number,
+  rng: HumanRng = Math.random,
+): MouseMovePlan {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const distance = Math.hypot(dx, dy);
+  if (!(distance >= 2)) {
+    return { points: [{ x: to.x, y: to.y, dtMs: 0 }], durationMs: 0 };
+  }
+  const width = Number.isFinite(targetWidthPx) && targetWidthPx > 0 ? targetWidthPx : 8;
+  const fitts = MOUSE_FITTS_A_MS + MOUSE_FITTS_B_MS * Math.log2(1 + (2 * distance) / Math.max(width, 8));
+  const moveMs = Math.min(Math.max(fitts, MOUSE_MIN_MOVE_MS), MOUSE_MAX_MOVE_MS);
+  const side = rng() < 0.5 ? 1 : -1;
+  const curveAmp = (0.06 + rng() * 0.24) * distance * side;
+  const cp1f = 0.3 + rng() * 0.15;
+  const cp2f = 0.65 + rng() * 0.15;
+  const nx = -dy / distance;
+  const ny = dx / distance;
+  let overshoot = 0;
+  if (distance > MOUSE_OVERSHOOT_DISTANCE_PX) {
+    overshoot = Math.abs(gauss01(rng)) * MOUSE_OVERSHOOT_SIGMA_PX;
+  }
+  const p3x = to.x + (dx / distance) * overshoot;
+  const p3y = to.y + (dy / distance) * overshoot;
+  const p1x = from.x + dx * cp1f + nx * curveAmp * 0.7;
+  const p1y = from.y + dy * cp1f + ny * curveAmp * 0.7;
+  const p2x = from.x + dx * cp2f + nx * curveAmp * 0.4;
+  const p2y = from.y + dy * cp2f + ny * curveAmp * 0.4;
+  const steps = Math.min(Math.max(Math.round(moveMs / MOUSE_SAMPLE_INTERVAL_MS), 8), MOUSE_MAX_STEPS);
+  const tremorFreqX = 8 + rng() * 4;
+  const tremorFreqY = 8 + rng() * 4;
+  const tremorPhaseX = rng() * 2 * Math.PI;
+  const tremorPhaseY = rng() * 2 * Math.PI;
+  const points: MouseWaypoint[] = [];
+  for (let index = 1; index <= steps; index += 1) {
+    const t = index / steps;
+    const u = raisedCosine(t);
+    const elapsed = (index / steps) * moveMs;
+    const tremorX =
+      MOUSE_TREMOR_AMPLITUDE_PX * Math.sin(2 * Math.PI * tremorFreqX * (elapsed / 1000) + tremorPhaseX);
+    const tremorY =
+      MOUSE_TREMOR_AMPLITUDE_PX * Math.sin(2 * Math.PI * tremorFreqY * (elapsed / 1000) + tremorPhaseY);
+    points.push({
+      x: cubicBezier(from.x, p1x, p2x, p3x, u) + tremorX,
+      y: cubicBezier(from.y, p1y, p2y, p3y, u) + tremorY,
+      dtMs: moveMs / steps,
+    });
+  }
+  // Corrective submovements: each covers 30-60% of the residual error on a
+  // short eased segment; the last one lands exactly on the target.
+  const corrections = distance > MOUSE_OVERSHOOT_DISTANCE_PX ? 1 + Math.floor(rng() * 3) : distance > 80 ? (rng() < 0.5 ? 1 : 0) : 0;
+  let cursor = { x: p3x, y: p3y };
+  for (let correction = 0; correction < corrections; correction += 1) {
+    const last = correction === corrections - 1;
+    const fraction = last ? 1 : 0.3 + rng() * 0.3;
+    const target = last
+      ? { x: to.x, y: to.y }
+      : { x: cursor.x + (to.x - cursor.x) * fraction, y: cursor.y + (to.y - cursor.y) * fraction };
+    const duration = moveMs * (0.08 + rng() * 0.12);
+    const subSteps = Math.max(2, Math.round(duration / MOUSE_SAMPLE_INTERVAL_MS));
+    for (let index = 1; index <= subSteps; index += 1) {
+      const u = raisedCosine(index / subSteps);
+      points.push({
+        x: cursor.x + (target.x - cursor.x) * u,
+        y: cursor.y + (target.y - cursor.y) * u,
+        dtMs: duration / subSteps,
+      });
+    }
+    cursor = target;
+  }
+  // Hard total budget: scale sleeps uniformly rather than dropping the tail.
+  const total = points.reduce((sum, point) => sum + point.dtMs, 0);
+  if (total > MOUSE_MAX_TOTAL_MS && total > 0) {
+    const scale = MOUSE_MAX_TOTAL_MS / total;
+    const scaled = points.map((point) => ({ ...point, dtMs: point.dtMs * scale }));
+    return { points: scaled, durationMs: MOUSE_MAX_TOTAL_MS };
+  }
+  return { points, durationMs: total };
+}
+
+/**
+ * Jittered click point inside an element box: gaussian offset scaled to
+ * 18% of the half-size, clamped inside with a 1px margin. Humans rarely
+ * hit the exact center twice; clamping keeps every click on-target
+ * (an outside "miss" could activate the wrong element, so misses are
+ * modeled as short-stop approaches inside the submovement structure,
+ * never as off-target clicks).
+ */
+export function jitterClickPoint(
+  box: { minX: number; minY: number; maxX: number; maxY: number },
+  rng: HumanRng = Math.random,
+): MousePoint {
+  const cx = (box.minX + box.maxX) / 2;
+  const cy = (box.minY + box.maxY) / 2;
+  const sigmaX = Math.max((box.maxX - box.minX) / 2, 1) * MOUSE_CLICK_JITTER_FRACTION;
+  const sigmaY = Math.max((box.maxY - box.minY) / 2, 1) * MOUSE_CLICK_JITTER_FRACTION;
+  const x = Math.min(Math.max(cx + gauss01(rng) * sigmaX, box.minX + 1), Math.max(box.maxX - 1, box.minX + 1));
+  const y = Math.min(Math.max(cy + gauss01(rng) * sigmaY, box.minY + 1), Math.max(box.maxY - 1, box.minY + 1));
+  return { x, y };
+}
+
+/** Pre-click hover dwell: lognormal around 120ms (40-500ms). */
+export function hoverDwellMs(rng: HumanRng = Math.random): number {
+  return Math.round(sampleLognormal(120, 0.55, 40, 500, rng));
+}
+
+/** Mouse-button hold time: lognormal around 75ms (30-300ms). */
+export function pressHoldMs(rng: HumanRng = Math.random): number {
+  return Math.round(sampleLognormal(75, 0.5, 30, 300, rng));
+}
+
+/** Typing modes for humanized entry. */
+export type HumanTypeMode = "keys" | "insert";
+
+export const HUMAN_TYPE_MODE_DEFAULT: HumanTypeMode = "keys";
+
+/** Normalize an optional typing mode; defaults to keys (real key events). */
+export function normalizeHumanTypeMode(raw: unknown): HumanTypeMode | null {
+  if (raw === undefined) {
+    return HUMAN_TYPE_MODE_DEFAULT;
+  }
+  if (raw === "keys" || raw === "insert") {
+    return raw;
+  }
+  return null;
+}
+
+/** Character budget for keys mode (real events are slower than inserts). */
+export const HUMAN_KEYS_MODE_MAX_CHARS = 1500;

@@ -11,8 +11,8 @@ Mutating tier: only snapshot/get-text are pre-approved; clicks, fills, key press
 ## Flow
 
 1. `browser_snapshot {maxNodes?}` (max 1500) — get opaque element `ref`s. Refs are latest-snapshot-only.
-2. Act once — instant: `browser_click {ref}` | `browser_fill {ref, text}` (replace) | `browser_type {ref, text}` (append at caret) | `browser_press_key {key}` (Enter, Tab, Escape, Backspace, Delete, arrows, Home, End, PageUp, PageDown, Space, letters, digits, F1-F12 + Control/Shift/Alt/Meta) | `browser_evaluate {expression, timeoutMs?}` (by-value result only).
-3. Prefer humanized composites when the page has bot/rate checks or the flow needs several inputs in one call: `browser_type_human {ref, text, wpm?}` (chunked WPM pacing, default 80) | `browser_press_sequence {keys[], delayMs?}` (e.g. `["Control+a","Backspace","Enter"]`) | `browser_click_type {ref, text, humanize?, wpm?, submitKey?}` (login/search in one call).
+2. Act once — instant: `browser_click {ref}` (add `humanize: true` for a neuromotor mouse path: curved trajectory, hover dwell, press-hold) | `browser_fill {ref, text}` (replace) | `browser_type {ref, text}` (append at caret) | `browser_press_key {key}` (Enter, Tab, Escape, Backspace, Delete, arrows, Home, End, PageUp, PageDown, Space, letters, digits, F1-F12 + Control/Shift/Alt/Meta) | `browser_evaluate {expression, timeoutMs?}` (by-value result only).
+3. Prefer humanized composites when the page has bot/rate checks or the flow needs several inputs in one call: `browser_type_human {ref, text, wpm?, mode?}` (`keys` default: real per-character key events with lognormal flight/dwell timing; `insert`: paced CDP inserts, faster but no key-event trail; passwords always insert; keys mode caps at 1500 chars) | `browser_press_sequence {keys[], delayMs?}` (e.g. `["Control+a","Backspace","Enter"]`) | `browser_click_type {ref, text, humanize?, wpm?, mode?, submitKey?}` (login/search in one call; humanize also drives the mouse path).
 4. **Re-snapshot** before the next act — every action above invalidates prior refs.
 5. Read back with `browser_get_text {ref}` (fresh read, keeps refs).
 

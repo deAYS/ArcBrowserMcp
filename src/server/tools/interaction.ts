@@ -50,11 +50,17 @@ export function registerInteractionTools(server: McpServer, services: Interactio
     {
       title: "Click element",
       description:
-        "Dispatch a real left mouse click to a live snapshot element ref on the selected tab. Invalidates snapshot refs.",
-      inputSchema: z.object({ ref: z.string() }),
+        "Dispatch a real left mouse click to a live snapshot element ref on the selected tab. Set humanize for a neuromotor mouse path (Bezier arc, hover dwell, hold time) instead of an instant click. Invalidates snapshot refs.",
+      inputSchema: z.object({ ref: z.string(), humanize: z.boolean().optional() }),
       outputSchema: AcceptedSchema,
     },
-    (args) => callTool(() => services.browser.click(args.ref)),
+    (args) =>
+      callTool(() =>
+        services.browser.click(
+          args.ref,
+          ...(args.humanize !== undefined ? [{ humanize: args.humanize } as const] : []),
+        ),
+      ),
   );
 
   server.registerTool(
@@ -98,15 +104,21 @@ export function registerInteractionTools(server: McpServer, services: Interactio
     {
       title: "Humanized type",
       description:
-        "Type text with human-like chunk pacing (one call fans out to many CDP inserts with WPM timing). Use for humanized form entry; invalidates snapshot refs.",
-      inputSchema: z.object({ ref: z.string(), text: z.string(), wpm: z.number().int().min(20).max(200).optional() }),
+        "Type text with biometric keystroke timing (lognormal flight/dwell, digraph speedups, thinking pauses). Mode keys (default) emits real per-character key events; insert uses paced CDP inserts. Use for humanized form entry; invalidates snapshot refs.",
+      inputSchema: z.object({
+        ref: z.string(),
+        text: z.string(),
+        wpm: z.number().int().min(20).max(200).optional(),
+        mode: z.enum(["keys", "insert"]).optional(),
+      }),
       outputSchema: AcceptedSchema,
     },
     (args) =>
       callTool(() =>
-        args.wpm === undefined
-          ? services.browser.typeHuman(args.ref, args.text)
-          : services.browser.typeHuman(args.ref, args.text, { wpm: args.wpm }),
+        services.browser.typeHuman(args.ref, args.text, {
+          ...(args.wpm !== undefined ? { wpm: args.wpm } : {}),
+          ...(args.mode !== undefined ? { mode: args.mode } : {}),
+        }),
       ),
   );
 
@@ -135,12 +147,13 @@ export function registerInteractionTools(server: McpServer, services: Interactio
     {
       title: "Click then type",
       description:
-        "Real mouse click then type (optionally humanized) plus an optional submit key — login/search in one call. Invalidates snapshot refs.",
+        "Real mouse click then type (optionally humanized) plus an optional submit key — login/search in one call. Humanize enables the neuromotor mouse path and keystroke pacing; mode selects keys (default, real key events) or insert. Invalidates snapshot refs.",
       inputSchema: z.object({
         ref: z.string(),
         text: z.string(),
         humanize: z.boolean().optional(),
         wpm: z.number().int().min(20).max(200).optional(),
+        mode: z.enum(["keys", "insert"]).optional(),
         submitKey: z.string().optional(),
       }),
       outputSchema: AcceptedSchema,
@@ -150,6 +163,7 @@ export function registerInteractionTools(server: McpServer, services: Interactio
         services.browser.clickType(args.ref, args.text, {
           ...(args.humanize !== undefined ? { humanize: args.humanize } : {}),
           ...(args.wpm !== undefined ? { wpm: args.wpm } : {}),
+          ...(args.mode !== undefined ? { mode: args.mode } : {}),
           ...(args.submitKey !== undefined ? { submitKey: args.submitKey } : {}),
         }),
       ),

@@ -45,6 +45,7 @@ function registeredToolNames(): string[] {
 /** Frozen public tool set: must not expand. */
 export const FROZEN_PUBLIC_TOOLS = [
   "browser_click",
+  "browser_click_type",
   "browser_close_tab",
   "browser_console",
   "browser_evaluate",
@@ -57,20 +58,22 @@ export const FROZEN_PUBLIC_TOOLS = [
   "browser_network",
   "browser_open_tab",
   "browser_press_key",
+  "browser_press_sequence",
   "browser_reload",
   "browser_screenshot",
   "browser_select_tab",
   "browser_snapshot",
   "browser_status",
   "browser_type",
+  "browser_type_human",
   "browser_wait_for",
 ] as const;
 
 describe("public tool set is frozen (no feature expansion)", () => {
-  it("registers exactly the 20 approved tools and no more", () => {
+  it("registers exactly the 23 approved tools and no more", () => {
     const actual = registeredToolNames();
     expect(actual).toEqual([...FROZEN_PUBLIC_TOOLS]);
-    expect(actual).toHaveLength(20);
+    expect(actual).toHaveLength(23);
   });
 
   it("server.ts wires exactly the approved registrations", () => {
@@ -196,8 +199,8 @@ describe("final static security audit", () => {
   });
 
   it("pins native host identity: name, registry key, origin, and extension ID", () => {
-    expect(NATIVE_HOST_NAME).toBe("com.BROWSER_mcp.bridge");
-    expect(NATIVE_HOST_REGISTRY_KEY).toBe("HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.BROWSER_mcp.bridge");
+    expect(NATIVE_HOST_NAME).toBe("com.arc_mcp.bridge");
+    expect(NATIVE_HOST_REGISTRY_KEY).toBe("HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.arc_mcp.bridge");
     const identity = JSON.parse(readSource("extension/identity.json")) as { publicKey?: unknown };
     expect(typeof identity.publicKey).toBe("string");
     const id = extensionIdFromPublicKeyBase64(identity.publicKey as string);

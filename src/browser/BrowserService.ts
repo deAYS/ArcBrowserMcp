@@ -2,6 +2,7 @@ import type { BrowserEngine } from "./BrowserEngine.js";
 import type {
   BrowserStatus,
   BrowserTab,
+  ClickOptions,
   ClickTypeOptions,
   ConsoleClearResult,
   ConsoleResult,
@@ -123,9 +124,9 @@ export class BrowserService {
   }
 
   /** Click a live snapshot ref on the selected tab (invalidates refs). */
-  async click(ref: string): Promise<{ accepted: true }> {
+  async click(ref: string, options?: ClickOptions): Promise<{ accepted: true }> {
     const engine = this.requireEngine("click");
-    await engine.click(ref);
+    await engine.click(ref, options);
     return { accepted: true };
   }
 

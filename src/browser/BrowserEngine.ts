@@ -1,6 +1,7 @@
 import type {
   BrowserStatus,
   BrowserTab,
+  ClickOptions,
   ClickTypeOptions,
   ConsoleClearResult,
   ConsoleResult,
@@ -42,7 +43,7 @@ export interface BrowserEngine {
   goForward(): Promise<void>;
   reload(ignoreCache?: boolean): Promise<void>;
   snapshot(options?: SnapshotOptions): Promise<SnapshotResult>;
-  click(ref: ElementRef): Promise<void>;
+  click(ref: ElementRef, options?: ClickOptions): Promise<void>;
   fill(ref: ElementRef, text: string): Promise<void>;
   type(ref: ElementRef, text: string): Promise<void>;
   pressKey(key: string): Promise<void>;

@@ -37,8 +37,10 @@ import {
   HUMANIZE_SEQUENCE_DELAY_MIN_MS,
   HUMANIZE_WPM_MAX,
   HUMANIZE_WPM_MIN,
+  HUMAN_KEYS_MODE_MAX_CHARS,
   INTERACTION_TEXT_LIMIT_BYTES,
   PRESS_SEQUENCE_MAX_KEYS,
+  normalizeHumanTypeMode,
   normalizeSequenceDelayMs,
   normalizeWpm,
   parsePressKey,
@@ -74,6 +76,7 @@ import type { BrowserEngine } from "../BrowserEngine.js";
 import type {
   BrowserStatus,
   BrowserTab,
+  ClickOptions,
   ConsoleEntry,
   ConsoleResult,
   ElementRef,
@@ -895,16 +898,20 @@ export class ExtensionEngine implements BrowserEngine {
     return mutable as unknown as SnapshotNode;
   }
 
-  async click(_ref: ElementRef): Promise<void> {
+  async click(_ref: ElementRef, _options?: ClickOptions): Promise<void> {
     const selectedTabId = this.selectedTabId;
     if (selectedTabId === null) {
       throw browserNoSelectedTab("click");
+    }
+    const humanize = _options?.humanize ?? false;
+    if (typeof humanize !== "boolean") {
+      throw browserInteractionFailed("click", "humanize must be a boolean");
     }
     await this.requireSelectedTab(selectedTabId, "click");
     try {
       await this.runtime.request(
         "interaction.click",
-        { tabId: selectedTabId, ref: _ref },
+        { tabId: selectedTabId, ref: _ref, ...(humanize ? { humanize: true } : {}) },
         this.operationTimeoutMs(),
       );
     } catch (error: unknown) {
@@ -984,12 +991,25 @@ export class ExtensionEngine implements BrowserEngine {
     if (_options?.wpm !== undefined && (wpm < HUMANIZE_WPM_MIN || wpm > HUMANIZE_WPM_MAX)) {
       throw browserInvalidText(0, INTERACTION_TEXT_LIMIT_BYTES);
     }
+    const mode = normalizeHumanTypeMode(_options?.mode);
+    if (mode === null) {
+      throw browserInvalidText(0, INTERACTION_TEXT_LIMIT_BYTES);
+    }
+    // Real key events are slower than inserts: bound the keys-mode budget
+    // and scale the RPC timeout with text length (insert keeps its cap).
+    if (mode === "keys" && Array.from(_text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
+      throw browserInvalidText(Array.from(_text).length, HUMAN_KEYS_MODE_MAX_CHARS);
+    }
     await this.requireSelectedTab(selectedTabId, "human-type on");
+    const timeoutMs =
+      mode === "keys"
+        ? Math.max(this.operationTimeoutMs(), 30_000 + Array.from(_text).length * 300)
+        : Math.max(this.operationTimeoutMs(), 30_000);
     try {
       await this.runtime.request(
         "interaction.typeHuman",
-        { tabId: selectedTabId, ref: _ref, text: _text, wpm },
-        Math.max(this.operationTimeoutMs(), 30_000),
+        { tabId: selectedTabId, ref: _ref, text: _text, wpm, mode },
+        timeoutMs,
       );
     } catch (error: unknown) {
       throw this.interactionFailure(selectedTabId, "human type", error);
@@ -1045,11 +1065,22 @@ export class ExtensionEngine implements BrowserEngine {
     if (wpm === null) {
       throw browserInvalidText(0, INTERACTION_TEXT_LIMIT_BYTES);
     }
+    const mode = normalizeHumanTypeMode(_options?.mode);
+    if (mode === null) {
+      throw browserInvalidText(0, INTERACTION_TEXT_LIMIT_BYTES);
+    }
+    if (mode === "keys" && Array.from(_text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
+      throw browserInvalidText(Array.from(_text).length, HUMAN_KEYS_MODE_MAX_CHARS);
+    }
     const submitKey = _options?.submitKey;
     if (submitKey !== undefined && ("error" in parsePressKey(submitKey) || typeof submitKey !== "string")) {
       throw browserInvalidKey(typeof submitKey === "string" ? submitKey : "(invalid submit key)");
     }
     await this.requireSelectedTab(selectedTabId, "click-type on");
+    const timeoutMs =
+      humanize && mode === "keys"
+        ? Math.max(this.operationTimeoutMs(), 30_000 + Array.from(_text).length * 300)
+        : Math.max(this.operationTimeoutMs(), 30_000);
     try {
       await this.runtime.request(
         "interaction.clickType",
@@ -1059,9 +1090,10 @@ export class ExtensionEngine implements BrowserEngine {
           text: _text,
           humanize,
           wpm,
+          mode,
           ...(submitKey !== undefined ? { submitKey } : {}),
         },
-        Math.max(this.operationTimeoutMs(), 30_000),
+        timeoutMs,
       );
     } catch (error: unknown) {
       throw this.interactionFailure(selectedTabId, "click-type", error);

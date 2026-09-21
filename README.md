@@ -6,7 +6,7 @@ Local MCP server for driving Arc Browser on Windows. Clients talk to it over std
 - HTTP/HTTPS navigation plus back, forward, reload
 - Accessibility snapshots with opaque element refs
 - Real click, fill, type, and key interaction
-- Humanized composites: paced typing, key sequences, click-type in one call
+- Humanized composites: biometric typing (lognormal keystroke timing, real key events), neuromotor mouse paths, key sequences, click-type in one call
 - Element text reads
 - JavaScript evaluation with by-value results
 - Viewport PNG screenshots
@@ -108,13 +108,13 @@ Point any stdio-capable MCP client at this command, for example with command `no
 | `browser_go_forward` | Navigate the selected tab forward in its history. |
 | `browser_reload` | Reload the selected tab. |
 | `browser_snapshot` | Capture a read-only semantic Accessibility snapshot of the selected tab with opaque element refs for later interaction. |
-| `browser_click` | Dispatch a real left mouse click to a live snapshot element ref on the selected tab. Invalidates snapshot refs. |
+| `browser_click` | Dispatch a real left mouse click to a live snapshot element ref on the selected tab. Set `humanize` for a neuromotor mouse path (curved trajectory, hover dwell, press-hold). Invalidates snapshot refs. |
 | `browser_fill` | Replace an editable control's text with the supplied text (real keyboard/input mechanics, no script). Invalidates snapshot refs. |
 | `browser_type` | Insert text at the caret without clearing the field (real input mechanics, no script). Invalidates snapshot refs. |
 | `browser_press_key` | Dispatch a supported key/chord (Enter, Tab, Escape, Backspace, Delete, arrows, Home, End, PageUp, PageDown, Space, letters, digits, F1-F12, optional Control/Shift/Alt/Meta) to the selected tab. Invalidates snapshot refs. |
-| `browser_type_human` | Type with human-like chunk pacing at a WPM rate (one call fans out to many inserts). Invalidates snapshot refs. |
+| `browser_type_human` | Type with biometric keystroke timing (lognormal flight/dwell, digraph speedups). `keys` mode (default) emits real per-character key events; `insert` uses paced CDP inserts. Invalidates snapshot refs. |
 | `browser_press_sequence` | Press an ordered key sequence with inter-key delay in one call. Invalidates snapshot refs. |
-| `browser_click_type` | Real click then type (optionally humanized) plus optional submit key in one call. Invalidates snapshot refs. |
+| `browser_click_type` | Real click then type (optionally humanized: neuromotor mouse path plus keystroke pacing) plus optional submit key in one call. Invalidates snapshot refs. |
 | `browser_get_text` | Fresh semantic Accessibility read of a live snapshot element ref. Read-only; password/protected values stay redacted. |
 | `browser_evaluate` | Evaluate JavaScript in the selected controllable page and return a by-value result. Arbitrary page JS may run; refs are invalidated after dispatch. |
 | `browser_screenshot` | Capture the current viewport of the selected tab as PNG. Read-only; does not invalidate refs. |

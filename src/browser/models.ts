@@ -7,6 +7,9 @@
 /** Stable identifier for a browser tab managed by the MCP server. */
 export type TabId = string;
 
+import type { HumanTypeMode } from "./interactionPolicy.js";
+export type { HumanTypeMode };
+
 /**
  * Opaque reference to an actionable element from a page snapshot.
  */
@@ -105,9 +108,20 @@ export interface InteractionResult {
   readonly accepted: true;
 }
 
+export interface ClickOptions {
+  /** Neuromotor mouse path (Bezier + hover + hold) when true; default false (instant). */
+  readonly humanize?: boolean;
+}
+
 export interface TypeHumanOptions {
-  /** Words per minute 20-200; default 80. Controls chunk pacing. */
+  /** Words per minute 20-200; default 80. Controls keystroke pacing. */
   readonly wpm?: number;
+  /**
+   * keys (default): per-character real key events with lognormal
+   * flight/dwell timing. insert: chunked insertText with the same rhythm
+   * model, faster but with no key-event trail. Passwords always use insert.
+   */
+  readonly mode?: HumanTypeMode;
 }
 
 export interface PressSequenceOptions {
@@ -116,10 +130,16 @@ export interface PressSequenceOptions {
 }
 
 export interface ClickTypeOptions {
-  /** Raw text is replaced by humanized chunk pacing when true (default). */
+  /**
+   * Humanized flow when true (default): neuromotor mouse path for the
+   * click plus keystroke pacing for the text. False means instant click
+   * plus a single insert.
+   */
   readonly humanize?: boolean;
   /** WPM used when humanize is true; default 80. */
   readonly wpm?: number;
+  /** Typing mode used when humanize is true; default keys. */
+  readonly mode?: HumanTypeMode;
   /** Optional single submit key pressed after typing (e.g. "Enter"). */
   readonly submitKey?: string;
 }

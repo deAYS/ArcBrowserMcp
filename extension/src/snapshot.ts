@@ -56,14 +56,23 @@ import {
   HUMANIZE_WPM_DEFAULT,
   HUMANIZE_WPM_MAX,
   HUMANIZE_WPM_MIN,
+  HUMAN_KEYS_MODE_MAX_CHARS,
   INTERACTION_TEXT_LIMIT_BYTES,
   PRESS_SEQUENCE_MAX_KEYS,
-  chunkTextForHumanize,
-  humanizeChunkDelayMs,
+  hoverDwellMs,
+  jitterClickPoint,
+  normalizeHumanTypeMode,
   normalizeSequenceDelayMs,
   normalizeWpm,
   parsePressKey,
+  planInsertChunks,
+  planKeystrokes,
+  planMouseMove,
+  pressHoldMs,
   utf8ByteLength,
+  type HumanRng,
+  type HumanTypeMode,
+  type MousePoint,
 } from "../../src/browser/interactionPolicy.js";
 import {
   EVALUATE_DEFAULT_TIMEOUT_MS,
@@ -299,6 +308,13 @@ interface TabSnapshotEntry {
   snapshotId: string;
   refs: Map<string, string>;
   url: string;
+  /**
+   * Last observed cursor position for this tab (viewport CSS px). Drives
+   * humanized mouse paths: the next move starts where the cursor actually
+   * is instead of teleporting. Survives navigation/detach (the OS cursor
+   * does not reset); dropped with the entry on tab close.
+   */
+  lastMouse?: MousePoint;
 }
 
 export interface SnapshotCaptureResult {
@@ -957,6 +973,19 @@ export class DebuggerSessionManager {
     chromeId: number,
     backendNodeId: number,
   ): Promise<{ x: number; y: number }> {
+    const box = await this.clickBox(chromeId, backendNodeId);
+    return { x: box.x, y: box.y };
+  }
+
+  /**
+   * Scroll into view, then return the click box: center plus bounds. The
+   * humanized path jitters inside the bounds; the instant path uses the
+   * exact center (unchanged legacy behavior).
+   */
+  private async clickBox(
+    chromeId: number,
+    backendNodeId: number,
+  ): Promise<{ x: number; y: number; minX: number; minY: number; maxX: number; maxY: number }> {
     await this.interactionSend(chromeId, "DOM.scrollIntoViewIfNeeded", { backendNodeId });
     const quads = await this.interactionSend(chromeId, "DOM.getContentQuads", { backendNodeId });
     const raw = quads["quads"];
@@ -990,9 +1019,58 @@ export class DebuggerSessionManager {
       if (!(maxX > minX) || !(maxY > minY)) {
         continue;
       }
-      return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+      return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, minX, minY, maxX, maxY };
     }
     throw new SnapshotError("ELEMENT_NOT_INTERACTABLE", "the target has no usable visible geometry");
+  }
+
+  /**
+   * Humanized click replay: neuromotor path from the last observed cursor
+   * position, hover dwell, press-hold, release. All coordinates are rounded
+   * to integers (real mouse events never carry sub-pixel positions).
+   * Updates the tab's lastMouse so the next move starts truthfully.
+   */
+  private async replayHumanClick(
+    chromeId: number,
+    mouseState: { lastMouse?: MousePoint },
+    box: { x: number; y: number; minX: number; minY: number; maxX: number; maxY: number },
+  ): Promise<void> {
+    const rng: HumanRng = Math.random;
+    const end = jitterClickPoint(box, rng);
+    const from = mouseState.lastMouse ?? { x: end.x - 160, y: end.y - 90 };
+    const width = Math.max(box.maxX - box.minX, box.maxY - box.minY);
+    const plan = planMouseMove(from, end, width, rng);
+    for (const point of plan.points) {
+      await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+        type: "mouseMoved",
+        x: Math.round(point.x),
+        y: Math.round(point.y),
+        button: "none",
+        clickCount: 0,
+      });
+      if (point.dtMs > 0) {
+        await humanizeSleep(point.dtMs);
+      }
+    }
+    mouseState.lastMouse = { x: end.x, y: end.y };
+    await humanizeSleep(hoverDwellMs(rng));
+    const x = Math.round(end.x);
+    const y = Math.round(end.y);
+    await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+      type: "mousePressed",
+      x,
+      y,
+      button: "left",
+      clickCount: 1,
+    });
+    await humanizeSleep(pressHoldMs(rng));
+    await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+      type: "mouseReleased",
+      x,
+      y,
+      button: "left",
+      clickCount: 1,
+    });
   }
 
   /** Clear editable content through real keyboard mechanics (no Runtime). */
@@ -1029,7 +1107,7 @@ export class DebuggerSessionManager {
     });
   }
 
-  async clickElement(projectTabId: string, ref: string): Promise<{ clicked: true }> {
+  async clickElement(projectTabId: string, ref: string, humanize = false): Promise<{ clicked: true }> {
     const { chromeId, backendNodeId } = await this.beginInteraction(projectTabId, ref);
     try {
       let info: { nodeName: string; type: string | null; attributes: string[] };
@@ -1044,31 +1122,45 @@ export class DebuggerSessionManager {
           "file inputs cannot be clicked (no OS file picker is available)",
         );
       }
-      const point = await this.clickPoint(chromeId, backendNodeId);
-      try {
-        await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
-          type: "mouseMoved",
-          x: point.x,
-          y: point.y,
-          button: "none",
-          clickCount: 0,
-        });
-        await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
-          type: "mousePressed",
-          x: point.x,
-          y: point.y,
-          button: "left",
-          clickCount: 1,
-        });
-        await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
-          type: "mouseReleased",
-          x: point.x,
-          y: point.y,
-          button: "left",
-          clickCount: 1,
-        });
-      } catch (error: unknown) {
-        throw this.staleFromCommand(chromeId, projectTabId, error);
+      if (humanize !== true) {
+        const point = await this.clickPoint(chromeId, backendNodeId);
+        try {
+          await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+            type: "mouseMoved",
+            x: point.x,
+            y: point.y,
+            button: "none",
+            clickCount: 0,
+          });
+          await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+            type: "mousePressed",
+            x: point.x,
+            y: point.y,
+            button: "left",
+            clickCount: 1,
+          });
+          await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+            type: "mouseReleased",
+            x: point.x,
+            y: point.y,
+            button: "left",
+            clickCount: 1,
+          });
+        } catch (error: unknown) {
+          throw this.staleFromCommand(chromeId, projectTabId, error);
+        }
+        const stored = this.entries.get(chromeId);
+        if (stored !== undefined) {
+          stored.lastMouse = { x: point.x, y: point.y };
+        }
+      } else {
+        const box = await this.clickBox(chromeId, backendNodeId);
+        try {
+          const stored = this.entries.get(chromeId);
+          await this.replayHumanClick(chromeId, stored ?? {}, box);
+        } catch (error: unknown) {
+          throw this.staleFromCommand(chromeId, projectTabId, error);
+        }
       }
     } catch (error: unknown) {
       if (error instanceof SnapshotError) {
@@ -1234,29 +1326,47 @@ export class DebuggerSessionManager {
    * WPM-derived pacing (one bridge call -> many CDP inserts). Reuses only
    * the existing interaction allowlist (DOM.focus, Input.insertText).
    */
-  async typeHumanElement(projectTabId: string, ref: string, text: string, wpm?: number): Promise<{ typed: true }> {
+  async typeHumanElement(
+    projectTabId: string,
+    ref: string,
+    text: string,
+    wpm?: number,
+    mode: HumanTypeMode = "keys",
+  ): Promise<{ typed: true }> {
     const effectiveWpm = normalizeWpm(wpm);
     if (effectiveWpm === null) {
       throw new SnapshotError("INVALID_TEXT", "wpm is outside the 20-200 range");
+    }
+    if (normalizeHumanTypeMode(mode) === null) {
+      throw new SnapshotError("INVALID_TEXT", "mode must be keys or insert");
+    }
+    if (mode === "keys" && Array.from(text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
+      throw new SnapshotError(
+        "INVALID_TEXT",
+        `keys mode accepts at most ${String(HUMAN_KEYS_MODE_MAX_CHARS)} characters`,
+      );
     }
     void HUMANIZE_WPM_MIN;
     void HUMANIZE_WPM_MAX;
     const { chromeId, backendNodeId } = await this.beginInteraction(projectTabId, ref, text);
     try {
-      await this.requireEditable(chromeId, backendNodeId, projectTabId);
+      let info: { nodeName: string; type: string | null; attributes: string[] };
       try {
-        await this.interactionSend(chromeId, "DOM.focus", { backendNodeId });
-        const chunks = chunkTextForHumanize(text);
-        for (let index = 0; index < chunks.length; index += 1) {
-          const chunk = chunks[index] ?? "";
-          if (chunk.length === 0) {
-            continue;
-          }
-          await this.interactionSend(chromeId, "Input.insertText", { text: chunk });
-          if (index + 1 < chunks.length) {
-            await humanizeSleep(humanizeChunkDelayMs(effectiveWpm, index, chunk));
-          }
-        }
+        info = await this.classifyControl(chromeId, backendNodeId);
+      } catch (error: unknown) {
+        throw this.staleFromCommand(chromeId, projectTabId, error);
+      }
+      if (DebuggerSessionManager.isFileControl(info)) {
+        throw new SnapshotError("ELEMENT_NOT_EDITABLE", "file inputs cannot receive humanized input");
+      }
+      if (!DebuggerSessionManager.isEditableControl(info)) {
+        throw new SnapshotError("ELEMENT_NOT_EDITABLE", "the target is not an editable text control");
+      }
+      // Passwords always use inserts: key-event timing on secrets adds
+      // no stealth and widens the observable surface.
+      const isPassword = info.type === "password";
+      try {
+        await this.humanTypeText(chromeId, projectTabId, backendNodeId, text, effectiveWpm, mode, isPassword);
       } catch (error: unknown) {
         if (error instanceof SnapshotError) {
           throw error;
@@ -1271,6 +1381,90 @@ export class DebuggerSessionManager {
     }
     this.invalidateTabByProject(projectTabId);
     return { typed: true };
+  }
+
+  /**
+   * Shared keystroke engine for typeHuman/clickType. Keys mode emits real
+   * per-character key events (keydown/dwell/keyup) with lognormal flight
+   * timing; insert mode replays the same rhythm model through chunked
+   * insertText (no key-event trail, but faster).
+   */
+  private async humanTypeText(
+    chromeId: number,
+    projectTabId: string,
+    backendNodeId: number,
+    text: string,
+    wpm: number,
+    mode: HumanTypeMode,
+    isPassword: boolean,
+  ): Promise<void> {
+    const rng: HumanRng = Math.random;
+    await this.interactionSend(chromeId, "DOM.focus", { backendNodeId });
+    if (mode !== "keys" || isPassword) {
+      const chunks = planInsertChunks(text, wpm, rng);
+      for (let index = 0; index < chunks.length; index += 1) {
+        const chunk = chunks[index];
+        if (chunk === undefined || chunk.text.length === 0) {
+          continue;
+        }
+        await this.interactionSend(chromeId, "Input.insertText", { text: chunk.text });
+        if (index + 1 < chunks.length && chunk.delayMs > 0) {
+          await humanizeSleep(chunk.delayMs);
+        }
+      }
+      return;
+    }
+    const keystrokes = planKeystrokes(text, wpm, rng);
+    let first = true;
+    for (const entry of keystrokes) {
+      if (first) {
+        // Brief focus settle before the first key, never zero.
+        await humanizeSleep(30 + rng() * 50);
+        first = false;
+      } else if (entry.flightMs > 0) {
+        await humanizeSleep(entry.flightMs);
+      }
+      await this.dispatchHumanKey(chromeId, projectTabId, entry.char, entry.dwellMs);
+    }
+  }
+
+  /**
+   * One human keystroke: real keyDown/dwell/keyUp. Printable characters
+   * carry text on keyDown (the browser inserts them, as with a physical
+   * keyboard); Enter submits newlines; anything the key allowlist rejects
+   * (emoji, CJK, controls) falls back to a single insertText.
+   */
+  private async dispatchHumanKey(
+    chromeId: number,
+    projectTabId: string,
+    char: string,
+    dwellMs: number,
+  ): Promise<void> {
+    if (char === "\n") {
+      await this.dispatchParsedKey(chromeId, projectTabId, "Enter");
+      return;
+    }
+    const parsed = parsePressKey(char);
+    if ("error" in parsed || parsed.control || parsed.meta || parsed.alt) {
+      await this.interactionSend(chromeId, "Input.insertText", { text: char });
+      return;
+    }
+    const base = {
+      key: parsed.key,
+      code: parsed.code,
+      windowsVirtualKeyCode: parsed.windowsVirtualKeyCode,
+      nativeVirtualKeyCode: parsed.windowsVirtualKeyCode,
+      modifiers: parsed.modifiers,
+    };
+    try {
+      await this.interactionSend(chromeId, "Input.dispatchKeyEvent", { ...base, type: "keyDown", text: char });
+      if (dwellMs > 0) {
+        await humanizeSleep(dwellMs);
+      }
+      await this.interactionSend(chromeId, "Input.dispatchKeyEvent", { ...base, type: "keyUp" });
+    } catch (error: unknown) {
+      throw this.staleFromCommand(chromeId, projectTabId, error);
+    }
   }
 
   /**
@@ -1319,19 +1513,31 @@ export class DebuggerSessionManager {
 
   /**
    * Click-then-type composite: real mouse click, focus, then instant or
-   * humanized insert plus an optional submit key — the login/search flow
-   * in one bridge call. Reuses clickPoint + focus + insertText only.
+   * humanized typing plus an optional submit key — the login/search flow
+   * in one bridge call. Humanize enables the neuromotor mouse path and
+   * keystroke pacing; otherwise the click is instant and the text inserts
+   * in one shot. Reuses clickBox + focus + the shared typing engine only.
    */
   async clickTypeElement(
     projectTabId: string,
     ref: string,
     text: string,
-    options?: { humanize?: boolean; wpm?: number; submitKey?: string },
+    options?: { humanize?: boolean; wpm?: number; mode?: HumanTypeMode; submitKey?: string },
   ): Promise<{ typed: true }> {
     const humanize = options?.humanize ?? true;
     const effectiveWpm = normalizeWpm(options?.wpm);
     if (effectiveWpm === null) {
       throw new SnapshotError("INVALID_TEXT", "wpm is outside the 20-200 range");
+    }
+    const mode = normalizeHumanTypeMode(options?.mode);
+    if (mode === null) {
+      throw new SnapshotError("INVALID_TEXT", "mode must be keys or insert");
+    }
+    if (humanize && mode === "keys" && Array.from(text).length > HUMAN_KEYS_MODE_MAX_CHARS) {
+      throw new SnapshotError(
+        "INVALID_TEXT",
+        `keys mode accepts at most ${String(HUMAN_KEYS_MODE_MAX_CHARS)} characters`,
+      );
     }
     if (options?.submitKey !== undefined && ("error" in parsePressKey(options.submitKey) || typeof options.submitKey !== "string")) {
       throw new SnapshotError("INVALID_KEY", "unsupported submit key");
@@ -1348,31 +1554,45 @@ export class DebuggerSessionManager {
       if (DebuggerSessionManager.isFileControl(info)) {
         throw new SnapshotError("ELEMENT_NOT_EDITABLE", "file inputs cannot be click-typed");
       }
-      const point = await this.clickPoint(chromeId, backendNodeId);
-      try {
-        await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
-          type: "mouseMoved",
-          x: point.x,
-          y: point.y,
-          button: "none",
-          clickCount: 0,
-        });
-        await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
-          type: "mousePressed",
-          x: point.x,
-          y: point.y,
-          button: "left",
-          clickCount: 1,
-        });
-        await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
-          type: "mouseReleased",
-          x: point.x,
-          y: point.y,
-          button: "left",
-          clickCount: 1,
-        });
-      } catch (error: unknown) {
-        throw this.staleFromCommand(chromeId, projectTabId, error);
+      if (!humanize) {
+        const point = await this.clickPoint(chromeId, backendNodeId);
+        try {
+          await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+            type: "mouseMoved",
+            x: point.x,
+            y: point.y,
+            button: "none",
+            clickCount: 0,
+          });
+          await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+            type: "mousePressed",
+            x: point.x,
+            y: point.y,
+            button: "left",
+            clickCount: 1,
+          });
+          await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+            type: "mouseReleased",
+            x: point.x,
+            y: point.y,
+            button: "left",
+            clickCount: 1,
+          });
+        } catch (error: unknown) {
+          throw this.staleFromCommand(chromeId, projectTabId, error);
+        }
+        const stored = this.entries.get(chromeId);
+        if (stored !== undefined) {
+          stored.lastMouse = { x: point.x, y: point.y };
+        }
+      } else {
+        const box = await this.clickBox(chromeId, backendNodeId);
+        try {
+          const stored = this.entries.get(chromeId);
+          await this.replayHumanClick(chromeId, stored ?? {}, box);
+        } catch (error: unknown) {
+          throw this.staleFromCommand(chromeId, projectTabId, error);
+        }
       }
       try {
         await this.requireEditable(chromeId, backendNodeId, projectTabId);
@@ -1383,21 +1603,12 @@ export class DebuggerSessionManager {
         throw this.staleFromCommand(chromeId, projectTabId, error);
       }
       try {
-        await this.interactionSend(chromeId, "DOM.focus", { backendNodeId });
+        const isPassword = info.type === "password";
         if (!humanize) {
+          await this.interactionSend(chromeId, "DOM.focus", { backendNodeId });
           await this.interactionSend(chromeId, "Input.insertText", { text });
         } else {
-          const chunks = chunkTextForHumanize(text);
-          for (let index = 0; index < chunks.length; index += 1) {
-            const chunk = chunks[index] ?? "";
-            if (chunk.length === 0) {
-              continue;
-            }
-            await this.interactionSend(chromeId, "Input.insertText", { text: chunk });
-            if (index + 1 < chunks.length) {
-              await humanizeSleep(humanizeChunkDelayMs(effectiveWpm, index, chunk));
-            }
-          }
+          await this.humanTypeText(chromeId, projectTabId, backendNodeId, text, effectiveWpm, mode, isPassword);
         }
         if (options?.submitKey !== undefined) {
           await this.dispatchParsedKey(chromeId, projectTabId, options.submitKey);

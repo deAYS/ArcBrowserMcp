@@ -10,6 +10,7 @@ import type { BrowserEngine } from "../BrowserEngine.js";
 import type {
   BrowserStatus,
   BrowserTab,
+  ClickOptions,
   ClickTypeOptions,
   ConsoleClearResult,
   ConsoleResult,
@@ -245,7 +246,7 @@ export class CdpBrowserEngine implements BrowserEngine {
     return this.notImplemented("snapshot");
   }
 
-  async click(_ref: ElementRef): Promise<void> {
+  async click(_ref: ElementRef, _options?: ClickOptions): Promise<void> {
     return this.notImplemented("click");
   }
 
