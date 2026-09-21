@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/server";
 import type { BrowserService } from "../../browser/BrowserService.js";
-import { ArcError } from "../../errors/ArcError.js";
+import { BrowserError } from "../../errors/BrowserError.js";
 import { BridgeError } from "../../bridge/BridgeError.js";
 
 const ConsoleEntrySchema = z.object({
@@ -81,7 +81,7 @@ export interface ObservabilityToolServices {
  */
 function toToolError(error: unknown): { content: [{ type: "text"; text: string }]; isError: true } {
   const code =
-    error instanceof ArcError
+    error instanceof BrowserError
       ? error.code
       : error instanceof BridgeError
         ? error.code

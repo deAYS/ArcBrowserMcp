@@ -26,7 +26,7 @@ export interface HostRunOptions {
   readonly isPidAlive?: (pid: number) => boolean;
   /**
    * Dev-diagnostic launch/exit journal (file path). Every host start appends
-   * its argv and every exit appends its code, so Arc-launched runs (whose
+   * its argv and every exit appends its code, so browser-launched runs (whose
    * stderr is invisible) leave observable evidence. Never receives secrets:
    * only argv, codes, and safe messages are recorded.
    */
@@ -83,7 +83,7 @@ async function runHostInner(options: HostRunOptions): Promise<number> {
   const log = (message: string): void => {
     rawLog(message);
     // Mirror safe diagnostics into the journal: host stderr is invisible
-    // when Arc launches the host, so the journal is the only failure record.
+    // when the browser launches the host, so the journal is the only failure record.
     // Log call sites never include secrets (no nonces, no tokens).
     if (options.journalPath !== undefined) {
       try {

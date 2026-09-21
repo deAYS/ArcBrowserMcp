@@ -1,9 +1,10 @@
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config/index.js";
+import { browserSpec } from "./browser/chromium/spec.js";
 import { createLogger } from "./utils/logger.js";
 import { BrowserService } from "./browser/BrowserService.js";
-import { ArcExtensionEngine } from "./browser/extension/ArcExtensionEngine.js";
+import { ExtensionEngine } from "./browser/extension/ExtensionEngine.js";
 import { BridgeRuntime } from "./browser/extension/BridgeRuntime.js";
 import { extensionOrigin, loadExtensionIdentity } from "./bridge/extensionIdentity.js";
 import { BridgeError } from "./bridge/BridgeError.js";
@@ -11,13 +12,15 @@ import { createShutdownHandler, startStdioServer } from "./server/transport.js";
 
 /**
  * Production entry point (extension backend): construct the bridge
- * runtime and ArcExtensionEngine, connect (bounded wait for the running
- * Arc extension), then serve MCP. Browser startup failure is fatal (typed
- * diagnostic + non-zero exit) rather than a fake connected state.
+ * runtime and ExtensionEngine for the configured browser, connect
+ * (bounded wait for the running browser's extension), then serve MCP.
+ * Browser startup failure is fatal (typed diagnostic + non-zero exit)
+ * rather than a fake connected state.
  */
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger(config.logLevel);
+  const spec = browserSpec(config.browser);
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const identity = loadExtensionIdentity(repoRoot);
   logger.info("arc-mcp extension identity", {
@@ -56,7 +59,8 @@ async function main(): Promise<void> {
   });
   process.stdin.on("end", onStdinGone);
   process.stdin.on("close", onStdinGone);
-  const engine = new ArcExtensionEngine({
+  const engine = new ExtensionEngine({
+    spec,
     runtime,
     extensionId: identity.extensionId,
     connectTimeoutMs: config.extensionConnectTimeoutMs,

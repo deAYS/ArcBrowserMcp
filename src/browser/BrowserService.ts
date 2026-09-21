@@ -15,7 +15,7 @@ import type {
   WaitCondition,
   WaitResult,
 } from "./models.js";
-import { browserOperationNotImplemented, browserTabNotFound } from "../errors/ArcError.js";
+import { browserOperationNotImplemented, browserTabNotFound } from "../errors/BrowserError.js";
 
 /**
  * Browser control state orchestration.

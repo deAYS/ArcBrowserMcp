@@ -8,7 +8,9 @@ import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import type { StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 import type { CallToolResult } from "@modelcontextprotocol/client";
 import { BrowserService } from "../../src/browser/BrowserService.js";
-import { ArcExtensionEngine } from "../../src/browser/extension/ArcExtensionEngine.js";
+
+import { arcSpec } from "../../src/browser/chromium/spec.js";
+import { ExtensionEngine } from "../../src/browser/extension/ExtensionEngine.js";
 import { BridgeRuntime } from "../../src/browser/extension/BridgeRuntime.js";
 import { loadExtensionIdentity } from "../../src/bridge/extensionIdentity.js";
 import { createServer } from "../../src/server/server.js";
@@ -110,7 +112,8 @@ async function startFixture(): Promise<string> {
 }
 
 const engineRuntime = new BridgeRuntime({});
-const engine = new ArcExtensionEngine({
+const engine = new ExtensionEngine({
+    spec: arcSpec(),
   runtime: engineRuntime,
   extensionId: EXPECTED_ID,
   connectTimeoutMs: 180_000,

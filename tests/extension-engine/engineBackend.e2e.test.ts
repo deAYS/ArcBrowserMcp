@@ -6,13 +6,15 @@ import { InMemoryTransport } from "@modelcontextprotocol/client";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import type { StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 import { BrowserService } from "../../src/browser/BrowserService.js";
-import { ArcExtensionEngine } from "../../src/browser/extension/ArcExtensionEngine.js";
+
+import { arcSpec } from "../../src/browser/chromium/spec.js";
+import { ExtensionEngine } from "../../src/browser/extension/ExtensionEngine.js";
 import { BridgeRuntime } from "../../src/browser/extension/BridgeRuntime.js";
 import { loadExtensionIdentity } from "../../src/bridge/extensionIdentity.js";
 import { createServer } from "../../src/server/server.js";
 
 /**
- * Real ArcExtensionEngine + MCP integration (opt-in via
+ * Real ExtensionEngine + MCP integration (opt-in via
  * pnpm test:extension-engine; never runs under plain pnpm test).
  *
  * Uses the already-loaded real Arc extension (no tabs, no debugger, no
@@ -25,7 +27,8 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const EXPECTED_ID = loadExtensionIdentity(REPO_ROOT).extensionId;
 const BOUND_MS = 480_000;
 
-const engine = new ArcExtensionEngine({
+const engine = new ExtensionEngine({
+    spec: arcSpec(),
   runtime: new BridgeRuntime({}),
   extensionId: EXPECTED_ID,
   connectTimeoutMs: 180_000,

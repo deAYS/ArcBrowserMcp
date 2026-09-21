@@ -1,8 +1,7 @@
 /**
  * Shared browser-domain models owned by this project.
  *
- * These types are intentionally backend-agnostic: no Playwright, CDP,
- * Chrome, or Arc-specific library types may appear here.
+ * These types are intentionally backend-agnostic: no browser-library-specific types may appear here.
  */
 
 /** Stable identifier for a browser tab managed by the MCP server. */
@@ -17,7 +16,7 @@ export type BrowserConnectionState = "disconnected" | "connecting" | "connected"
 
 export type BrowserBackend = "none" | "cdp" | "extension";
 
-export type BrowserProfileMode = "dedicated-mcp-profile" | "normal-running-arc";
+export type BrowserProfileMode = "dedicated-mcp-profile" | "normal-running-session";
 
 export interface BrowserStatus {
   readonly connected: boolean;

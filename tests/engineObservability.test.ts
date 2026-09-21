@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { BridgeError } from "../src/bridge/BridgeError.js";
 import type { BridgeTransportMethod } from "../src/browser/extension/BridgeRuntime.js";
 import { BridgeRuntime } from "../src/browser/extension/BridgeRuntime.js";
-import { ArcExtensionEngine } from "../src/browser/extension/ArcExtensionEngine.js";
-import { ArcError } from "../src/errors/ArcError.js";
+
+import { arcSpec } from "../src/browser/chromium/spec.js";
+import { ExtensionEngine } from "../src/browser/extension/ExtensionEngine.js";
+import { BrowserError } from "../src/errors/BrowserError.js";
 import {
   CONSOLE_BUFFER_DEFAULT_ENTRIES,
   NETWORK_BUFFER_DEFAULT_ENTRIES,
@@ -122,11 +124,12 @@ class FakeObservabilityRuntime extends BridgeRuntime {
 }
 
 function harness(options: { consoleBufferEntries?: number; networkBufferEntries?: number } = {}): {
-  engine: ArcExtensionEngine;
+  engine: ExtensionEngine;
   runtime: FakeObservabilityRuntime;
 } {
   const runtime = new FakeObservabilityRuntime();
-  const engine = new ArcExtensionEngine({
+  const engine = new ExtensionEngine({
+      spec: arcSpec(),
     runtime,
     extensionId: EXTENSION_ID,
     connectTimeoutMs: 2_000,
@@ -137,7 +140,7 @@ function harness(options: { consoleBufferEntries?: number; networkBufferEntries?
 }
 
 async function connectSelected(options: Parameters<typeof harness>[0] = {}): Promise<{
-  engine: ArcExtensionEngine;
+  engine: ExtensionEngine;
   runtime: FakeObservabilityRuntime;
 }> {
   const h = harness(options);
@@ -151,8 +154,8 @@ async function catchCode(action: () => Promise<unknown>): Promise<string> {
   try {
     await action();
   } catch (error: unknown) {
-    expect(error).toBeInstanceOf(ArcError);
-    return (error as ArcError).code;
+    expect(error).toBeInstanceOf(BrowserError);
+    return (error as BrowserError).code;
   }
   throw new Error("expected action to throw");
 }

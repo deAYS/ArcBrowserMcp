@@ -9,17 +9,25 @@ export class ConfigError extends Error {
 }
 
 /**
+ * Target browser for discovery, launch, and user-facing messaging.
+ */
+export type BrowserId = "arc" | "chrome";
+export const DEFAULT_BROWSER: BrowserId = "arc";
+
+/**
  * Minimal application configuration.
  *
  * profilePath is the explicit ARC_MCP_PROFILE_PATH override, or undefined
  * when unset. An undefined profilePath means "use the stable per-user
- * default" resolved by ArcProfile (LOCALAPPDATA-based, never CWD-relative),
- * so the MCP host may start arc-mcp from any working directory.
+ * default" resolved by the chromium profile module (LOCALAPPDATA-based,
+ * never CWD-relative), so the MCP host may start arc-mcp from any working
+ * directory.
  */
 export interface AppConfig {
+  readonly browser: BrowserId;
   readonly debugPort: number;
   readonly profilePath: string | undefined;
-  readonly arcExecutablePath: string | undefined;
+  readonly executablePath: string | undefined;
   readonly allowedOrigins: readonly string[];
   readonly deniedOrigins: readonly string[];
   readonly allowEvaluate: boolean;
@@ -40,9 +48,10 @@ export const MAX_NETWORK_BUFFER_ENTRIES = 5000;
 
 export function defaultConfig(): AppConfig {
   return {
+    browser: DEFAULT_BROWSER,
     debugPort: DEFAULT_DEBUG_PORT,
     profilePath: undefined,
-    arcExecutablePath: undefined,
+    executablePath: undefined,
     allowedOrigins: [],
     deniedOrigins: [],
     allowEvaluate: false,
@@ -52,6 +61,19 @@ export function defaultConfig(): AppConfig {
     consoleBufferEntries: DEFAULT_CONSOLE_BUFFER_ENTRIES,
     networkBufferEntries: DEFAULT_NETWORK_BUFFER_ENTRIES,
   };
+}
+
+function parseBrowser(raw: string | undefined): BrowserId {
+  if (raw === undefined || raw === "") {
+    return DEFAULT_BROWSER;
+  }
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "arc" || normalized === "chrome") {
+    return normalized;
+  }
+  throw new ConfigError(
+    `Invalid browser: ${JSON.stringify(raw)}. Expected one of arc|chrome.`,
+  );
 }
 
 function parsePort(raw: string | undefined): number {
@@ -128,15 +150,16 @@ export function loadConfig(env: EnvLike = process.env): AppConfig {
   const profileRaw = env["ARC_MCP_PROFILE_PATH"]?.trim();
   const profilePath = profileRaw === undefined || profileRaw === "" ? undefined : profileRaw;
 
-  // Canonical ARC_MCP_ARC_EXECUTABLE_PATH wins; ARC_MCP_EXECUTABLE_PATH
-  // remains as a deprecated fallback alias.
-  const executableRaw =
-    env["ARC_MCP_ARC_EXECUTABLE_PATH"]?.trim() || env["ARC_MCP_EXECUTABLE_PATH"]?.trim();  const arcExecutablePath = executableRaw === undefined || executableRaw === "" ? undefined : executableRaw;
+  // Canonical ARC_MCP_EXECUTABLE_PATH wins; ARC_MCP_ARC_EXECUTABLE_PATH
+  // remains as a deprecated Arc-specific fallback alias.
+  const executableRaw = env["ARC_MCP_EXECUTABLE_PATH"]?.trim() || env["ARC_MCP_ARC_EXECUTABLE_PATH"]?.trim();
+  const executablePath = executableRaw === undefined || executableRaw === "" ? undefined : executableRaw;
 
   return {
+    browser: parseBrowser(env["ARC_MCP_BROWSER"]),
     debugPort: parsePort(env["ARC_MCP_DEBUG_PORT"]),
     profilePath,
-    arcExecutablePath,
+    executablePath,
     allowedOrigins: parseStringList(env["ARC_MCP_ALLOWED_ORIGINS"]),
     deniedOrigins: parseStringList(env["ARC_MCP_DENIED_ORIGINS"]),
     allowEvaluate: parseBoolean(env["ARC_MCP_ALLOW_EVALUATE"], false),

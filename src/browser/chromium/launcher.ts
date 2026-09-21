@@ -1,42 +1,43 @@
 import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import { promises as fs } from "node:fs";
-import type { ArcLaunchConfig } from "./ArcLaunchConfig.js";
-import { arcLaunchFailed, cdpPortInUse } from "../../errors/ArcError.js";
+import type { ChromiumLaunchConfig } from "./launchConfig.js";
+import { launchFailed, cdpPortInUse } from "../../errors/BrowserError.js";
 import { CDP_LOOPBACK_HOST, isTcpPortOccupied } from "../cdp/CdpReadiness.js";
 
 export type SpawnFn = typeof spawn;
 
-export interface ArcLauncherDeps {
+export interface BrowserLauncherDeps {
   readonly spawnImpl?: SpawnFn;
   readonly ensureDir?: (dir: string) => Promise<void>;
   readonly portOccupied?: (host: string, port: number) => Promise<boolean>;
 }
 
-export interface ArcExitInfo {
+export interface BrowserExitInfo {
   readonly code: number | null;
   readonly signal: string | null;
 }
 
 /**
- * Owns exactly one dedicated Arc process: the instance this process spawned.
+ * Owns exactly one dedicated browser process: the instance this process
+ * spawned.
  *
  * Never touches unrelated processes: shutdown signals only the retained
  * child handle, and launch refuses an already-occupied CDP port instead of
  * attaching to or killing whatever owns it.
  */
-export class ArcLauncher {
+export class BrowserLauncher {
   private child: ChildProcess | null = null;
   private spawnFailed = false;
-  private exitInfo: ArcExitInfo | null = null;
+  private exitInfo: BrowserExitInfo | null = null;
   private readonly exitListeners: Array<() => void> = [];
 
   constructor(
-    private readonly config: ArcLaunchConfig,
-    private readonly deps: ArcLauncherDeps = {},
+    private readonly config: ChromiumLaunchConfig,
+    private readonly deps: BrowserLauncherDeps = {},
   ) {}
 
-  get launchConfig(): ArcLaunchConfig {
+  get launchConfig(): ChromiumLaunchConfig {
     return this.config;
   }
 
@@ -78,7 +79,7 @@ export class ArcLauncher {
     try {
       await ensureDir(this.config.profilePath);
     } catch (error: unknown) {
-      throw arcLaunchFailed(`cannot create dedicated profile directory ${this.config.profilePath}`, error);
+      throw launchFailed(`cannot create dedicated profile directory ${this.config.profilePath}`, error);
     }
 
     const portOccupied = this.deps.portOccupied ?? isTcpPortOccupied;
@@ -96,7 +97,7 @@ export class ArcLauncher {
         windowsHide: true,
       });
     } catch (error: unknown) {
-      throw arcLaunchFailed(`spawn threw for ${this.config.executablePath}`, error);
+      throw launchFailed(`spawn threw for ${this.config.executablePath}`, error);
     }
     this.child = child;
     child.once("error", () => {
@@ -110,7 +111,7 @@ export class ArcLauncher {
     // Give the event loop a turn so a synchronous-feeling failure rejects here.
     await new Promise<void>((resolve, reject) => {
       child.once("error", (error: unknown) => {
-        reject(arcLaunchFailed(`failed to spawn ${this.config.executablePath}`, error));
+        reject(launchFailed(`failed to spawn ${this.config.executablePath}`, error));
       });
       child.once("spawn", () => resolve());
     });

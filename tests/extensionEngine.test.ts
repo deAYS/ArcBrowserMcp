@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { BridgeError } from "../src/bridge/BridgeError.js";
 import type { BridgeTransportMethod } from "../src/browser/extension/BridgeRuntime.js";
 import { BridgeRuntime } from "../src/browser/extension/BridgeRuntime.js";
-import { ArcExtensionEngine } from "../src/browser/extension/ArcExtensionEngine.js";
+
+import { arcSpec } from "../src/browser/chromium/spec.js";
+import { ExtensionEngine } from "../src/browser/extension/ExtensionEngine.js";
 import { BrowserService } from "../src/browser/BrowserService.js";
 
 const EXTENSION_ID = "abcdefghijklmnopabcdefghijklmnop";
@@ -58,9 +60,10 @@ class FakeRuntime extends BridgeRuntime {
   }
 }
 
-function engineWith(runtime?: FakeRuntime): { engine: ArcExtensionEngine; runtime: FakeRuntime } {
+function engineWith(runtime?: FakeRuntime): { engine: ExtensionEngine; runtime: FakeRuntime } {
   const fake = runtime ?? new FakeRuntime();
-  const engine = new ArcExtensionEngine({
+  const engine = new ExtensionEngine({
+      spec: arcSpec(),
     runtime: fake,
     extensionId: EXTENSION_ID,
     connectTimeoutMs: 2_000,
@@ -69,7 +72,7 @@ function engineWith(runtime?: FakeRuntime): { engine: ArcExtensionEngine; runtim
   return { engine, runtime: fake };
 }
 
-describe("ArcExtensionEngine lifecycle", () => {
+describe("ExtensionEngine lifecycle", () => {
   it("connects through preflight, runtime, relay, and status verification", async () => {
     const { engine, runtime } = engineWith();
     expect((await engine.status()).state).toBe("disconnected");
@@ -118,7 +121,8 @@ describe("ArcExtensionEngine lifecycle", () => {
 
   it("fails preflight without starting the runtime", async () => {
     const fake = new FakeRuntime();
-    const engine = new ArcExtensionEngine({
+    const engine = new ExtensionEngine({
+        spec: arcSpec(),
       runtime: fake,
       extensionId: EXTENSION_ID,
       checkPrerequisites: () =>
@@ -198,7 +202,8 @@ describe("ArcExtensionEngine lifecycle", () => {
   it("runs preflight once per process across reconnects", async () => {
     const fake = new FakeRuntime();
     let checks = 0;
-    const engine = new ArcExtensionEngine({
+    const engine = new ExtensionEngine({
+        spec: arcSpec(),
       runtime: fake,
       extensionId: EXTENSION_ID,
       connectTimeoutMs: 2_000,
@@ -218,7 +223,8 @@ describe("ArcExtensionEngine lifecycle", () => {
 
   it("fails after repeated verification timeouts within the connect budget", async () => {
     const fake = new FakeRuntime();
-    const fakeEngine = new ArcExtensionEngine({
+    const fakeEngine = new ExtensionEngine({
+        spec: arcSpec(),
       runtime: fake,
       extensionId: EXTENSION_ID,
       connectTimeoutMs: 600,
@@ -242,7 +248,7 @@ describe("ArcExtensionEngine lifecycle", () => {
   }, 30_000);
 });
 
-describe("ArcExtensionEngine page tools", () => {
+describe("ExtensionEngine page tools", () => {
   it("page tool operations are implemented (no not-implemented stub)", async () => {
     const { engine } = engineWith();
     expect(engine.evaluate).toBeDefined();

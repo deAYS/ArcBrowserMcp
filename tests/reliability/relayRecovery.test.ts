@@ -9,7 +9,9 @@ import { encodeNativeMessage, NativeFrameDecoder } from "../../src/bridge/native
 import { createSession, parseSessionDescriptor } from "../../src/bridge/session.js";
 import type { BridgeTransportMethod } from "../../src/browser/extension/BridgeRuntime.js";
 import { BridgeRuntime } from "../../src/browser/extension/BridgeRuntime.js";
-import { ArcExtensionEngine } from "../../src/browser/extension/ArcExtensionEngine.js";
+
+import { arcSpec } from "../../src/browser/chromium/spec.js";
+import { ExtensionEngine } from "../../src/browser/extension/ExtensionEngine.js";
 import { ExtensionBridge } from "../../extension/src/bridge.js";
 import type { NativePort } from "../../extension/src/bridge.js";
 
@@ -413,7 +415,8 @@ class FakeEngineRuntime extends BridgeRuntime {
 describe("engine status truthfulness", () => {
   it("connected requires live relay; disconnect/recovery converge without restart", async () => {
     const runtime = new FakeEngineRuntime();
-    const engine = new ArcExtensionEngine({
+    const engine = new ExtensionEngine({
+        spec: arcSpec(),
       runtime,
       extensionId: EXTENSION_ID,
       connectTimeoutMs: 2_000,

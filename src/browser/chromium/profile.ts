@@ -1,14 +1,14 @@
 import * as path from "node:path";
 import { ConfigError } from "../../config/config.js";
 import type { EnvLike } from "../../config/config.js";
-import { unsafeProfilePath } from "../../errors/ArcError.js";
+import { unsafeProfilePath } from "../../errors/BrowserError.js";
 
 /**
  * Dedicated MCP profile path logic.
  *
- * The MCP profile must live in a project-owned location, never inside Arc's
- * install tree, MSIX package data, or system directories. Paths are
- * normalized before every safety comparison, and comparisons are
+ * The MCP profile must live in a project-owned location, never inside a
+ * browser's install tree, MSIX package data, or system directories. Paths
+ * are normalized before every safety comparison, and comparisons are
  * case-insensitive on Windows.
  */
 
@@ -37,7 +37,7 @@ function windowsSystemRoots(): string[] {
   }
   const localAppData = process.env["LOCALAPPDATA"];
   if (localAppData !== undefined && localAppData !== "") {
-    // MSIX package data (including Arc's) must never host our profile.
+    // MSIX package data (including browsers') must never host our profile.
     roots.push(path.join(localAppData, "Packages"));
   }
   return roots;
@@ -53,28 +53,28 @@ function nonEmptyEnv(value: string | undefined): string | null {
 }
 
 /**
- * Stable per-user default MCP profile directory.
+ * Stable per-user default MCP profile directory for one browser.
  *
- * Primary: %LOCALAPPDATA%\arc-mcp\profile (Windows). Fallback when
- * LOCALAPPDATA is unavailable: <USERPROFILE>\AppData\Local\arc-mcp\profile
- * on Windows, ~/.arc-mcp/profile elsewhere. Never CWD-relative: an MCP host
+ * Primary: %LOCALAPPDATA%\arc-mcp\<profileDirName> (Windows). Fallback when
+ * LOCALAPPDATA is unavailable: <USERPROFILE>\AppData\Local\arc-mcp\<name>
+ * on Windows, ~/.arc-mcp/<name> elsewhere. Never CWD-relative: an MCP host
  * may start arc-mcp from any working directory. Throws a typed ConfigError
  * when no per-user base can be established.
  */
-export function defaultMcpProfilePath(env: EnvLike = process.env): string {
+export function defaultMcpProfilePath(profileDirName: string, env: EnvLike = process.env): string {
   const localAppData = nonEmptyEnv(env["LOCALAPPDATA"]);
   if (localAppData !== null) {
-    return path.join(localAppData, "arc-mcp", "profile");
+    return path.join(localAppData, "arc-mcp", profileDirName);
   }
   if (process.platform === "win32") {
     const userProfile = nonEmptyEnv(env["USERPROFILE"]);
     if (userProfile !== null) {
-      return path.join(userProfile, "AppData", "Local", "arc-mcp", "profile");
+      return path.join(userProfile, "AppData", "Local", "arc-mcp", profileDirName);
     }
   } else {
     const home = nonEmptyEnv(env["HOME"]);
     if (home !== null) {
-      return path.join(home, ".arc-mcp", "profile");
+      return path.join(home, ".arc-mcp", profileDirName);
     }
   }
   throw new ConfigError(
@@ -85,26 +85,28 @@ export function defaultMcpProfilePath(env: EnvLike = process.env): string {
 /**
  * Resolve the effective profile path: an explicit override is used verbatim
  * (and must still pass safety validation downstream); it is never rewritten
- * into the default. An absent override resolves to the stable default.
+ * into the default. An absent override resolves to the stable default for
+ * the given browser.
  */
 export function resolveMcpProfilePath(
   explicitPath: string | undefined,
+  profileDirName: string,
   env: EnvLike = process.env,
 ): string {
   if (explicitPath !== undefined && explicitPath.trim() !== "") {
     return path.resolve(explicitPath);
   }
-  return defaultMcpProfilePath(env);
+  return defaultMcpProfilePath(profileDirName, env);
 }
 
 export interface ProfileSafetyOptions {
-  /** Known Arc install/package locations; the profile must avoid all of them. */
-  readonly arcInstallDirs?: readonly string[];
+  /** Known browser install/package locations; the profile must avoid all. */
+  readonly installDirs?: readonly string[];
 }
 
 /**
- * Throw a typed ARC_PROFILE_PATH_UNSAFE error when the target is a
- * filesystem root, a system/package location, or an Arc-owned directory.
+ * Throw a typed BROWSER_PROFILE_PATH_UNSAFE error when the target is a
+ * filesystem root, a system/package location, or a browser-owned directory.
  */
 export function assertSafeProfilePath(resolvedAbsolute: string, options: ProfileSafetyOptions = {}): void {
   if (!path.isAbsolute(resolvedAbsolute)) {
@@ -118,9 +120,9 @@ export function assertSafeProfilePath(resolvedAbsolute: string, options: Profile
     dir,
     label: "system or package location",
   }));
-  for (const installDir of options.arcInstallDirs ?? []) {
+  for (const installDir of options.installDirs ?? []) {
     if (installDir.trim() !== "") {
-      forbidden.push({ dir: installDir, label: "Arc install/package location" });
+      forbidden.push({ dir: installDir, label: "browser install/package location" });
     }
   }
   for (const entry of forbidden) {

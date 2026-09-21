@@ -1,5 +1,5 @@
 import * as net from "node:net";
-import { arcExitedEarly, cdpReadyTimeout } from "../../errors/ArcError.js";
+import { processExitedEarly, cdpReadyTimeout } from "../../errors/BrowserError.js";
 
 export const CDP_LOOPBACK_HOST = "127.0.0.1";
 
@@ -85,7 +85,7 @@ export function cdpVersionUrl(port: number): string {
 
 /**
  * Poll /json/version until usable CDP metadata appears. TCP-open alone is
- * not sufficient. Throws ARC_CDP_READY_TIMEOUT when the bound expires.
+ * not sufficient. Throws BROWSER_CDP_READY_TIMEOUT when the bound expires.
  * Never throws for transient probe failures; the last error is reported.
  */
 export async function waitForCdpReady(
@@ -98,7 +98,7 @@ export async function waitForCdpReady(
   let lastError = "no probe attempted";
   for (;;) {
     if (options.isAlive !== undefined && !options.isAlive()) {
-      throw arcExitedEarly(port, options.describeExit?.() ?? "exit status unknown");
+      throw processExitedEarly(port, options.describeExit?.() ?? "exit status unknown");
     }
     try {
       const controller = new AbortController();
@@ -118,7 +118,7 @@ export async function waitForCdpReady(
         clearTimeout(timer);
       }
     } catch (error: unknown) {
-      // Expected while Arc starts (refused/timeout/abort): keep polling.
+      // Expected while the browser starts (refused/timeout/abort): keep polling.
       lastError = error instanceof Error ? error.message : String(error);
     }
     if (Date.now() >= deadline) {

@@ -57,13 +57,13 @@ export interface BridgeRuntimeOptions {
  *
  * Owns the MCP-side pipe server and session descriptor, surfaces relay
  * lifecycle events, and sends transport/health RPC. Multiple MCP processes
- * share one Arc session: the first runtime to start owns the bridge pipe
+ * share one browser session: the first runtime to start owns the bridge pipe
  * and serves the extension relay; later runtimes join the owner through a
  * clients pipe and forward requests (the owner serializes them onto the
  * relay). When the owner disappears, a joined runtime re-runs the
  * own-or-join decision, so ownership floats without any caller-visible
  * ceremony. Knows nothing about browser tabs, CDP, or MCP tools;
- * ArcExtensionEngine orchestrates connect/disconnect/status on top.
+ * ExtensionEngine orchestrates connect/disconnect/status on top.
  */
 export class BridgeRuntime {
   private server: McpPipeServer | null = null;

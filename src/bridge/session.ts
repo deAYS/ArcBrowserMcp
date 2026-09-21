@@ -110,7 +110,7 @@ export function defaultIsPidAlive(pid: number): boolean {
     // ESRCH: no such process (obviously stale). EPERM: the process EXISTS
     // but is unqueryable from here — notably when a browser-launched native
     // host runs under Chrome's restricted token. EPERM must never read as
-    // stale, or every Arc-spawned host would reject a live MCP session.
+    // stale, or every browser-spawned host would reject a live MCP session.
     return (error as { code?: unknown }).code === "EPERM";
   }
 }

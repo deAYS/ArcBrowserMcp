@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import * as path from "node:path";
 import { ConfigError } from "../src/config/config.js";
-import { ArcError } from "../src/errors/ArcError.js";
-import { resolveMcpProfilePath } from "../src/browser/arc/ArcProfile.js";
-import { buildArcLaunchConfig } from "../src/browser/arc/ArcLaunchConfig.js";
+import { BrowserError } from "../src/errors/BrowserError.js";
+import { resolveMcpProfilePath } from "../src/browser/chromium/profile.js";
+import { buildChromiumLaunchConfig } from "../src/browser/chromium/launchConfig.js";
 
-describe("Arc launch configuration builder", () => {
+describe("Chromium launch configuration builder", () => {
   it("builds executable, dedicated profile, port, and array args without spawning", () => {
     const exe = path.resolve("C:\\Arc\\Arc.exe");
-    const config = buildArcLaunchConfig({
+    const config = buildChromiumLaunchConfig({
       executablePath: exe,
       profilePath: path.resolve("C:\\arc-mcp-data\\profile"),
       debugPort: 9222,
@@ -23,7 +23,7 @@ describe("Arc launch configuration builder", () => {
   });
 
   it("adds no security-weakening flags", () => {
-    const config = buildArcLaunchConfig({
+    const config = buildChromiumLaunchConfig({
       executablePath: path.resolve("C:\\Arc\\Arc.exe"),
       profilePath: path.resolve("C:\\arc-mcp-data\\profile"),
       debugPort: 9222,
@@ -35,7 +35,7 @@ describe("Arc launch configuration builder", () => {
   });
 
   it("appends extra args after the managed arguments", () => {
-    const config = buildArcLaunchConfig({
+    const config = buildChromiumLaunchConfig({
       executablePath: path.resolve("C:\\Arc\\Arc.exe"),
       profilePath: path.resolve("C:\\arc-mcp-data\\profile"),
       debugPort: 9333,
@@ -47,7 +47,7 @@ describe("Arc launch configuration builder", () => {
 
   it("rejects an out-of-range debug port with a typed error", () => {
     expect(() =>
-      buildArcLaunchConfig({
+      buildChromiumLaunchConfig({
         executablePath: path.resolve("C:\\Arc\\Arc.exe"),
         profilePath: path.resolve("C:\\arc-mcp-data\\profile"),
         debugPort: 99999,
@@ -56,9 +56,9 @@ describe("Arc launch configuration builder", () => {
   });
 
   it("uses the stable absolute default profile for --user-data-dir", () => {
-    const profile = resolveMcpProfilePath(undefined);
+    const profile = resolveMcpProfilePath(undefined, "profile");
     expect(path.isAbsolute(profile)).toBe(true);
-    const config = buildArcLaunchConfig({
+    const config = buildChromiumLaunchConfig({
       executablePath: path.resolve("C:\\Arc\\Arc.exe"),
       profilePath: profile,
       debugPort: 9222,
@@ -70,11 +70,21 @@ describe("Arc launch configuration builder", () => {
   it("rejects a profile inside the executable directory", () => {
     const exe = path.resolve("C:\\Arc\\Arc.exe");
     expect(() =>
-      buildArcLaunchConfig({
+      buildChromiumLaunchConfig({
         executablePath: exe,
         profilePath: path.join(path.dirname(exe), "profile"),
         debugPort: 9222,
       }),
-    ).toThrow(ArcError);
+    ).toThrow(BrowserError);
+  });
+
+  it("rejects a profile inside a browser install dir (chrome case)", () => {
+    expect(() =>
+      buildChromiumLaunchConfig({
+        executablePath: path.resolve("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"),
+        profilePath: path.resolve("C:\\Program Files\\Google\\Chrome\\Application\\mcp-profile"),
+        debugPort: 9222,
+      }),
+    ).toThrow(BrowserError);
   });
 });

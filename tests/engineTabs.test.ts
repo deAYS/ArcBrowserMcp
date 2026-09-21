@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { BridgeError } from "../src/bridge/BridgeError.js";
 import type { BridgeTransportMethod } from "../src/browser/extension/BridgeRuntime.js";
 import { BridgeRuntime } from "../src/browser/extension/BridgeRuntime.js";
-import { ArcExtensionEngine } from "../src/browser/extension/ArcExtensionEngine.js";
+
+import { arcSpec } from "../src/browser/chromium/spec.js";
+import { ExtensionEngine } from "../src/browser/extension/ExtensionEngine.js";
 import { BrowserService } from "../src/browser/BrowserService.js";
-import { ArcError } from "../src/errors/ArcError.js";
+import { BrowserError } from "../src/errors/BrowserError.js";
 import type { BrowserTab } from "../src/browser/models.js";
 
 const EXTENSION_ID = "abcdefghijklmnopabcdefghijklmnop";
@@ -122,9 +124,10 @@ class FakeTabsRuntime extends BridgeRuntime {
   }
 }
 
-function engineWith(): { engine: ArcExtensionEngine; runtime: FakeTabsRuntime } {
+function engineWith(): { engine: ExtensionEngine; runtime: FakeTabsRuntime } {
   const runtime = new FakeTabsRuntime();
-  const engine = new ArcExtensionEngine({
+  const engine = new ExtensionEngine({
+      spec: arcSpec(),
     runtime,
     extensionId: EXTENSION_ID,
     connectTimeoutMs: 2_000,
@@ -133,7 +136,7 @@ function engineWith(): { engine: ArcExtensionEngine; runtime: FakeTabsRuntime } 
   return { engine, runtime };
 }
 
-async function connectedEngine(): Promise<{ engine: ArcExtensionEngine; runtime: FakeTabsRuntime }> {
+async function connectedEngine(): Promise<{ engine: ExtensionEngine; runtime: FakeTabsRuntime }> {
   const harness = engineWith();
   await harness.engine.connect();
   return harness;
@@ -184,8 +187,8 @@ describe("engine tab operations", () => {
     } catch (error: unknown) {
       caught = error;
     }
-    expect(caught).toBeInstanceOf(ArcError);
-    expect((caught as ArcError).code).toBe("BROWSER_TAB_NOT_FOUND");
+    expect(caught).toBeInstanceOf(BrowserError);
+    expect((caught as BrowserError).code).toBe("BROWSER_TAB_NOT_FOUND");
     expect((await engine.status()).selectedTabId).toBeNull();
   });
 
@@ -207,7 +210,7 @@ describe("engine tab operations", () => {
       } catch (error: unknown) {
         caught = error;
       }
-      expect((caught as ArcError).code).toBe("BROWSER_TAB_CREATE_FAILED");
+      expect((caught as BrowserError).code).toBe("BROWSER_TAB_CREATE_FAILED");
     }
     expect(runtime.requests.length).toBe(before);
   });

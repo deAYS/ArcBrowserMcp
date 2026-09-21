@@ -1,12 +1,12 @@
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { ArcError } from "../src/errors/ArcError.js";
-import type { ArcLaunchConfig } from "../src/browser/arc/ArcLaunchConfig.js";
-import { ArcLauncher } from "../src/browser/arc/ArcLauncher.js";
-import type { SpawnFn } from "../src/browser/arc/ArcLauncher.js";
+import { BrowserError } from "../src/errors/BrowserError.js";
+import type { ChromiumLaunchConfig } from "../src/browser/chromium/launchConfig.js";
+import { BrowserLauncher } from "../src/browser/chromium/launcher.js";
+import type { SpawnFn } from "../src/browser/chromium/launcher.js";
 
-const TEST_CONFIG: ArcLaunchConfig = {
+const TEST_CONFIG: ChromiumLaunchConfig = {
   executablePath: "C:\\Arc\\Arc.exe",
   profilePath: "C:\\arc-mcp-test\\profile",
   debugPort: 9333,
@@ -45,10 +45,10 @@ async function captureCode(action: () => Promise<unknown>): Promise<unknown> {
   throw new Error("expected action to throw");
 }
 
-describe("ArcLauncher", () => {
+describe("BrowserLauncher", () => {
   it("refuses an occupied CDP port without spawning", async () => {
     let spawns = 0;
-    const launcher = new ArcLauncher(TEST_CONFIG, {
+    const launcher = new BrowserLauncher(TEST_CONFIG, {
       ensureDir: () => Promise.resolve(),
       portOccupied: () => Promise.resolve(true),
       spawnImpl: (() => {
@@ -57,27 +57,27 @@ describe("ArcLauncher", () => {
       }) as SpawnFn,
     });
     const caught = await captureCode(() => launcher.launch());
-    expect(caught).toBeInstanceOf(ArcError);
-    expect((caught as ArcError).code).toBe("ARC_CDP_PORT_IN_USE");
+    expect(caught).toBeInstanceOf(BrowserError);
+    expect((caught as BrowserError).code).toBe("BROWSER_CDP_PORT_IN_USE");
     expect(spawns).toBe(0);
   });
 
-  it("reports ARC_LAUNCH_FAILED when spawn emits an error", async () => {
+  it("reports BROWSER_LAUNCH_FAILED when spawn emits an error", async () => {
     const child = new FakeChild();
-    const launcher = new ArcLauncher(TEST_CONFIG, {
+    const launcher = new BrowserLauncher(TEST_CONFIG, {
       ensureDir: () => Promise.resolve(),
       portOccupied: () => Promise.resolve(false),
       spawnImpl: fakeSpawn(child, "error"),
     });
     const caught = await captureCode(() => launcher.launch());
-    expect(caught).toBeInstanceOf(ArcError);
-    expect((caught as ArcError).code).toBe("ARC_LAUNCH_FAILED");
+    expect(caught).toBeInstanceOf(BrowserError);
+    expect((caught as BrowserError).code).toBe("BROWSER_LAUNCH_FAILED");
     expect(launcher.isRunning()).toBe(false);
   });
 
   it("tracks a running owned process and its early exit", async () => {
     const child = new FakeChild();
-    const launcher = new ArcLauncher(TEST_CONFIG, {
+    const launcher = new BrowserLauncher(TEST_CONFIG, {
       ensureDir: () => Promise.resolve(),
       portOccupied: () => Promise.resolve(false),
       spawnImpl: fakeSpawn(child, "spawn"),
@@ -93,7 +93,7 @@ describe("ArcLauncher", () => {
 
   it("shutdown signals only the owned child and escalates boundedly", async () => {
     const child = new FakeChild();
-    const launcher = new ArcLauncher(TEST_CONFIG, {
+    const launcher = new BrowserLauncher(TEST_CONFIG, {
       ensureDir: () => Promise.resolve(),
       portOccupied: () => Promise.resolve(false),
       spawnImpl: fakeSpawn(child, "spawn"),
@@ -105,7 +105,7 @@ describe("ArcLauncher", () => {
   });
 
   it("shutdown on a never-launched instance is a side-effect-free no-op", async () => {
-    const launcher = new ArcLauncher(TEST_CONFIG, {
+    const launcher = new BrowserLauncher(TEST_CONFIG, {
       ensureDir: () => Promise.reject(new Error("must not run")),
     });
     await launcher.shutdown();

@@ -1,13 +1,19 @@
 import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
-import { arcNotFound, invalidArcExecutablePath } from "../../errors/ArcError.js";
+import type { BrowserSpec } from "./spec.js";
+import { browserNotFound, invalidExecutablePath } from "../../errors/BrowserError.js";
 
-export type ArcDiscoverySource = "explicit" | "running-process" | "appx-package" | "execution-alias";
+export type DiscoverySource =
+  | "explicit"
+  | "running-process"
+  | "appx-package"
+  | "install-dir"
+  | "execution-alias";
 
-export interface ArcDiscoveryResult {
+export interface DiscoveryResult {
   readonly executablePath: string;
-  readonly source: ArcDiscoverySource;
+  readonly source: DiscoverySource;
   readonly packageFullName?: string;
   readonly packageVersion?: string;
   readonly installLocation?: string;
@@ -20,28 +26,27 @@ export interface AppxPackageInfo {
   readonly version: string;
 }
 
-/** MSIX package identity for Arc on Windows. Never a filesystem path. */
-export const ARC_PACKAGE_NAME = "TheBrowserCompany.Arc";
-export const ARC_EXECUTABLE_BASENAME = "Arc.exe";
 /** Finite bound for every OS/package probe. */
 export const PROBE_TIMEOUT_MS = 10_000;
 
 /**
  * Seam for OS/package probes. The default implementation uses built-in Node
- * APIs; tests inject fakes so no test depends on Arc being installed.
+ * APIs; tests inject fakes so no test depends on a browser being installed.
+ * Each probe is parameterized by data from the BrowserSpec, never by the
+ * spec object itself.
  */
 export interface DiscoveryProbes {
   /** True when path exists and is a regular file (follows reparse points). */
   isExecutableFile(candidatePath: string): Promise<boolean>;
-  /** Installed Arc MSIX package metadata, or null when absent/unreadable. */
-  queryAppxPackage(): Promise<AppxPackageInfo | null>;
-  /** Executable paths of running Arc processes (best effort, read-only). */
-  readRunningArcPaths(): Promise<string[]>;
+  /** Installed MSIX package metadata, or null when absent/unreadable. */
+  queryAppxPackage(packageName: string): Promise<AppxPackageInfo | null>;
+  /** Executable paths of running processes with the given image name. */
+  readRunningProcessPaths(processName: string): Promise<string[]>;
   /** Stable execution-alias candidates to check, in priority order. */
-  executionAliasCandidates(): string[];
+  executionAliasCandidates(executableBasename: string): string[];
 }
 
-export interface DiscoverArcOptions {
+export interface DiscoverOptions {
   readonly explicitPath?: string;
   readonly probes?: DiscoveryProbes;
 }
@@ -56,6 +61,7 @@ function resolveAbsolute(candidate: string): string {
 
 async function firstValidCandidate(
   candidates: readonly string[],
+  executableBasename: string,
   probes: DiscoveryProbes,
 ): Promise<string | null> {
   const seen = new Set<string>();
@@ -66,7 +72,7 @@ async function firstValidCandidate(
       continue;
     }
     seen.add(key);
-    if (!sameFileName(resolved, ARC_EXECUTABLE_BASENAME)) {
+    if (!sameFileName(resolved, executableBasename)) {
       continue;
     }
     if (await probes.isExecutableFile(resolved)) {
@@ -85,27 +91,38 @@ async function bestEffort<T>(action: () => Promise<T>, fallback: T): Promise<T> 
   }
 }
 
+/** Interpolation guard for PowerShell probe scripts (fixed spec constants). */
+function isSafeProbeToken(token: string): boolean {
+  return /^[A-Za-z0-9._-]+$/.test(token);
+}
+
 /**
- * Discover the Arc executable using ordered strategies without launching it:
- * explicit config > running-process image > MSIX package metadata >
- * execution alias. Throws typed ArcError on invalid explicit config or when
- * every strategy is exhausted. Never spawns Arc itself.
+ * Discover the browser executable using ordered strategies without
+ * launching it: explicit config > running-process image > MSIX package
+ * metadata (when the spec has one) > install-dir candidates >
+ * execution alias. Throws a typed BrowserError on invalid explicit config
+ * or when every strategy is exhausted. Never spawns the browser itself.
  */
-export async function discoverArcExecutable(options: DiscoverArcOptions = {}): Promise<ArcDiscoveryResult> {
+export async function discoverExecutable(
+  spec: BrowserSpec,
+  options: DiscoverOptions = {},
+): Promise<DiscoveryResult> {
   const probes = options.probes ?? defaultProbes;
   const tried: string[] = [];
 
   const explicitRaw = options.explicitPath?.trim();
   if (explicitRaw !== undefined && explicitRaw !== "") {
     const resolved = resolveAbsolute(explicitRaw);
-    if (!sameFileName(resolved, ARC_EXECUTABLE_BASENAME)) {
-      throw invalidArcExecutablePath(
+    if (!sameFileName(resolved, spec.executableBasename)) {
+      throw invalidExecutablePath(
+        spec.displayName,
         options.explicitPath ?? explicitRaw,
-        `expected a file named ${ARC_EXECUTABLE_BASENAME}`,
+        `expected a file named ${spec.executableBasename}`,
       );
     }
     if (!(await probes.isExecutableFile(resolved))) {
-      throw invalidArcExecutablePath(
+      throw invalidExecutablePath(
+        spec.displayName,
         options.explicitPath ?? explicitRaw,
         "path does not refer to an existing executable file",
       );
@@ -114,35 +131,53 @@ export async function discoverArcExecutable(options: DiscoverArcOptions = {}): P
   }
 
   tried.push("running-process");
-  const processPaths = await bestEffort(() => probes.readRunningArcPaths(), []);
-  const fromProcess = await firstValidCandidate(processPaths, probes);
+  const processPaths = await bestEffort(() => probes.readRunningProcessPaths(spec.processName), []);
+  const fromProcess = await firstValidCandidate(processPaths, spec.executableBasename, probes);
   if (fromProcess !== null) {
     return { executablePath: fromProcess, source: "running-process" };
   }
 
-  tried.push("appx-package");
-  const appx = await bestEffort(() => probes.queryAppxPackage(), null);
-  if (appx !== null) {
-    const candidate = path.join(appx.installLocation, ARC_EXECUTABLE_BASENAME);
-    const validated = await firstValidCandidate([candidate], probes);
-    if (validated !== null) {
-      return {
-        executablePath: validated,
-        source: "appx-package",
-        packageFullName: appx.packageFullName,
-        packageVersion: appx.version,
-        installLocation: appx.installLocation,
-      };
+  if (spec.appxPackageName !== null) {
+    tried.push("appx-package");
+    const appx = await bestEffort(() => probes.queryAppxPackage(spec.appxPackageName as string), null);
+    if (appx !== null) {
+      const candidate = path.join(appx.installLocation, spec.executableBasename);
+      const validated = await firstValidCandidate([candidate], spec.executableBasename, probes);
+      if (validated !== null) {
+        return {
+          executablePath: validated,
+          source: "appx-package",
+          packageFullName: appx.packageFullName,
+          packageVersion: appx.version,
+          installLocation: appx.installLocation,
+        };
+      }
+    }
+  }
+
+  if (spec.installDirCandidates.length > 0) {
+    tried.push("install-dir");
+    const fromInstallDir = await firstValidCandidate(
+      spec.installDirCandidates.map((dir) => path.join(dir, spec.executableBasename)),
+      spec.executableBasename,
+      probes,
+    );
+    if (fromInstallDir !== null) {
+      return { executablePath: fromInstallDir, source: "install-dir" };
     }
   }
 
   tried.push("execution-alias");
-  const alias = await firstValidCandidate(probes.executionAliasCandidates(), probes);
+  const alias = await firstValidCandidate(
+    probes.executionAliasCandidates(spec.executableBasename),
+    spec.executableBasename,
+    probes,
+  );
   if (alias !== null) {
     return { executablePath: alias, source: "execution-alias" };
   }
 
-  throw arcNotFound(tried);
+  throw browserNotFound(spec.displayName, tried);
 }
 
 function runPowerShellJson(script: string): Promise<unknown> {
@@ -175,7 +210,7 @@ function nonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
 }
 
-function toAppxInfo(value: unknown): AppxPackageInfo | null {
+function toAppxInfo(value: unknown, packageName: string): AppxPackageInfo | null {
   const entries = Array.isArray(value) ? value : [value];
   for (const entry of entries) {
     if (!isRecord(entry)) {
@@ -186,8 +221,8 @@ function toAppxInfo(value: unknown): AppxPackageInfo | null {
       continue;
     }
     return {
-      name: nonEmptyString(entry["Name"]) ?? ARC_PACKAGE_NAME,
-      packageFullName: nonEmptyString(entry["PackageFullName"]) ?? ARC_PACKAGE_NAME,
+      name: nonEmptyString(entry["Name"]) ?? packageName,
+      packageFullName: nonEmptyString(entry["PackageFullName"]) ?? packageName,
       installLocation,
       version: nonEmptyString(entry["Version"]) ?? "unknown",
     };
@@ -204,16 +239,22 @@ async function defaultIsExecutableFile(candidatePath: string): Promise<boolean> 
   }
 }
 
-async function defaultQueryAppxPackage(): Promise<AppxPackageInfo | null> {
-  // Fixed script; package name is a constant, no user input is interpolated.
-  const script = `Get-AppxPackage -Name '${ARC_PACKAGE_NAME}' | Select-Object Name, PackageFullName, InstallLocation, Version | ConvertTo-Json -Compress -Depth 3`;
+async function defaultQueryAppxPackage(packageName: string): Promise<AppxPackageInfo | null> {
+  // Interpolation guard above; callers pass fixed spec constants.
+  if (!isSafeProbeToken(packageName)) {
+    return null;
+  }
+  const script = `Get-AppxPackage -Name '${packageName}' | Select-Object Name, PackageFullName, InstallLocation, Version | ConvertTo-Json -Compress -Depth 3`;
   const parsed = await runPowerShellJson(script);
-  return toAppxInfo(parsed);
+  return toAppxInfo(parsed, packageName);
 }
 
-async function defaultReadRunningArcPaths(): Promise<string[]> {
+async function defaultReadRunningProcessPaths(processName: string): Promise<string[]> {
   // Read-only inspection of process image paths; never attaches or signals.
-  const script = `Get-Process -Name 'Arc' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path`;
+  if (!isSafeProbeToken(processName)) {
+    return [];
+  }
+  const script = `Get-Process -Name '${processName}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Path`;
   const parsed: unknown = await new Promise<unknown>((resolve, reject) => {
     execFile(
       "powershell.exe",
@@ -237,17 +278,17 @@ async function defaultReadRunningArcPaths(): Promise<string[]> {
     .filter((line) => line !== "");
 }
 
-function defaultExecutionAliasCandidates(): string[] {
+function defaultExecutionAliasCandidates(executableBasename: string): string[] {
   const localAppData = process.env["LOCALAPPDATA"];
   if (localAppData === undefined || localAppData === "") {
     return [];
   }
-  return [path.join(localAppData, "Microsoft", "WindowsApps", ARC_EXECUTABLE_BASENAME)];
+  return [path.join(localAppData, "Microsoft", "WindowsApps", executableBasename)];
 }
 
 export const defaultProbes: DiscoveryProbes = {
   isExecutableFile: defaultIsExecutableFile,
   queryAppxPackage: defaultQueryAppxPackage,
-  readRunningArcPaths: defaultReadRunningArcPaths,
+  readRunningProcessPaths: defaultReadRunningProcessPaths,
   executionAliasCandidates: defaultExecutionAliasCandidates,
 };

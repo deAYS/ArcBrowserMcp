@@ -1,12 +1,20 @@
 /**
  * Shared bridge constants: single source for host name, pipe namespace,
  * and registry locations so install/check/host/extension can never drift.
+ *
+ * The host name, pipe namespace, and state directory keep the historical
+ * `arc-mcp` identity: renaming them would invalidate every existing
+ * install. Per-browser data lives in src/browser/chromium/spec.ts.
  */
 
 export const NATIVE_HOST_NAME = "com.arc_mcp.bridge";
-export const NATIVE_HOST_DESCRIPTION = "Arc MCP Native Messaging Bridge";
+export const NATIVE_HOST_DESCRIPTION = "arc-mcp Native Messaging Bridge";
 
-/** HKCU vendor path for Chromium-compatible native host registration. */
+/**
+ * HKCU vendor path for Chromium-compatible native host registration.
+ * Chromium browsers (Arc, Chrome, ...) share the Google\Chrome key, so one
+ * registration serves them all. Firefox later needs Software\Mozilla.
+ */
 export const NATIVE_HOST_REGISTRY_KEY =
   "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.arc_mcp.bridge";
 

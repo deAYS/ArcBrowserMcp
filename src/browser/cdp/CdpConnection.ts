@@ -1,6 +1,6 @@
 import { chromium } from "playwright-core";
 import type { Browser } from "playwright-core";
-import { cdpConnectFailed, cdpNoContext } from "../../errors/ArcError.js";
+import { cdpConnectFailed, cdpNoContext } from "../../errors/BrowserError.js";
 import { CDP_LOOPBACK_HOST } from "./CdpReadiness.js";
 
 export interface CdpConnectionDeps {
@@ -8,7 +8,7 @@ export interface CdpConnectionDeps {
 }
 
 /**
- * Playwright CDP attachment for one dedicated Arc instance.
+ * Playwright CDP attachment for one dedicated browser instance.
  *
  * Playwright types never leave this module: consumers see only connection
  * state, context counts, and typed errors. No tabs/pages are created here.

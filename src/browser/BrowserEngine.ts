@@ -24,7 +24,7 @@ import type {
  *
  * Method signatures use project-owned
  * request/result models so backends can be added without rewriting this
- * interface. Nothing here may reference Playwright, CDP, or Arc APIs.
+ * interface. Nothing here may reference Playwright, CDP, or any browser-specific API.
  */
 export interface BrowserEngine {
   connect(): Promise<void>;

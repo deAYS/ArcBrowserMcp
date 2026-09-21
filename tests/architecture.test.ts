@@ -52,13 +52,14 @@ describe("architecture boundaries", () => {
     }
   });
 
-  it("Arc discovery/launch modules stay outside the engine contract", () => {
+  it("browser discovery/launch modules stay outside the engine contract", () => {
     const engine = readSource("src/browser/BrowserEngine.ts");
-    expect(engine).not.toMatch(/from\s+["']\.\/arc\//);
+    expect(engine).not.toMatch(/from\s+["']\.\/(arc|chromium|chrome)\//);
     for (const file of [
-      "src/browser/arc/ArcDiscovery.ts",
-      "src/browser/arc/ArcProfile.ts",
-      "src/browser/arc/ArcLaunchConfig.ts",
+      "src/browser/chromium/discovery.ts",
+      "src/browser/chromium/profile.ts",
+      "src/browser/chromium/spec.ts",
+      "src/browser/chromium/launchConfig.ts",
     ]) {
       const source = readSource(file).toLowerCase();
       for (const token of ["playwright", "puppeteer", "chrome-remote-interface"]) {
@@ -68,13 +69,20 @@ describe("architecture boundaries", () => {
   });
 
   it("launch configuration never spawns a process", () => {
-    for (const file of ["src/browser/arc/ArcLaunchConfig.ts", "src/browser/arc/ArcProfile.ts"]) {
+    for (const file of ["src/browser/chromium/launchConfig.ts", "src/browser/chromium/profile.ts"]) {
       const raw = readSource(file);
       expect(forbiddenImports(raw), `${file} must not import child_process`).toEqual([]);
       const code = stripComments(raw);
       expect(code, `${file} must not call process-spawn APIs`).not.toMatch(
         /\b(spawn|spawnSync|execFile|execFileSync|exec|execSync|fork)\s*\(/,
       );
+    }
+  });
+
+  it("specs are data-only: no OS probes, no spawn, no child_process", () => {
+    const code = stripComments(readSource("src/browser/chromium/spec.ts"));
+    for (const token of ["node:child_process", "node:fs", "powershell", "spawn", "exec"]) {
+      expect(code.toLowerCase(), `spec.ts must not contain ${token}`).not.toContain(token);
     }
   });
 
@@ -195,8 +203,8 @@ describe("bridge boundaries", () => {
 });
 
 describe("extension engine boundaries", () => {
-  it("ArcExtensionEngine exposes no browser-library or transport types", () => {
-    for (const file of ["src/browser/extension/ArcExtensionEngine.ts", "src/browser/extension/BridgeRuntime.ts"]) {
+  it("ExtensionEngine exposes no browser-library or transport types", () => {
+    for (const file of ["src/browser/extension/ExtensionEngine.ts", "src/browser/extension/BridgeRuntime.ts"]) {
       const raw = readSource(file);
       expect(forbiddenImports(raw), `${file} must not import browser libraries`).toEqual([]);
       const code = stripComments(raw).toLowerCase();
@@ -204,7 +212,7 @@ describe("extension engine boundaries", () => {
         expect(code, `${file} must not mention ${token}`).not.toContain(token);
       }
     }
-    const engine = readSource("src/browser/extension/ArcExtensionEngine.ts");
+    const engine = readSource("src/browser/extension/ExtensionEngine.ts");
     expect(engine).not.toMatch(/from\s+["']\.\.\/(cdp|arc)\//);
   });
 
@@ -220,7 +228,7 @@ describe("extension engine boundaries", () => {
       connected: true,
       state: "connected",
       backend: "extension",
-      profileMode: "normal-running-arc",
+      profileMode: "normal-running-session",
       selectedTabId: null,
       extensionConnected: true,
       relayConnected: true,
@@ -268,7 +276,7 @@ describe("navigation boundaries", () => {
   });
 
   it("snapshot and later operations are real implementations in the extension engine", () => {
-    const engine = stripComments(readSource("src/browser/extension/ArcExtensionEngine.ts"));
+    const engine = stripComments(readSource("src/browser/extension/ExtensionEngine.ts"));
     // snapshot + interactions + page tools are all real; the
     // notImplemented helper is gone (CdpBrowserEngine keeps its own stubs).
     for (const operation of ["click", "fill", "type", "pressKey", "getText", "screenshot", "evaluate", "waitFor"]) {
@@ -339,9 +347,9 @@ describe("navigation boundaries", () => {
     }
     const registrations = [...background.matchAll(/\.onRemoteRequest\s*\(/g)];
     expect(registrations).toHaveLength(1);
-    const engine = stripComments(readSource("src/browser/extension/ArcExtensionEngine.ts"));
+    const engine = stripComments(readSource("src/browser/extension/ExtensionEngine.ts"));
     for (const token of ["Accessibility", "DOM.describeNode", "sendCommand", "cdp.send"]) {
-      expect(engine, `ArcExtensionEngine must not contain ${token}`).not.toContain(token);
+      expect(engine, `ExtensionEngine must not contain ${token}`).not.toContain(token);
     }
     const runtime = stripComments(readSource("src/browser/extension/BridgeRuntime.ts"));
     // CDP-level tokens never appear; typed bridge method names below are
@@ -366,7 +374,7 @@ describe("navigation boundaries", () => {
     const server = stripComments(readSource("src/server/server.ts"));
     expect(server).toContain("registerInteractionTools");
     expect(server).toContain("registerPageTools");
-    const engine = stripComments(readSource("src/browser/extension/ArcExtensionEngine.ts"));
+    const engine = stripComments(readSource("src/browser/extension/ExtensionEngine.ts"));
     for (const operation of ["screenshot", "evaluate", "waitFor"]) {
       expect(engine).not.toContain(`notImplemented("${operation}")`);
     }
@@ -397,9 +405,9 @@ describe("navigation boundaries", () => {
   it("snapshot keeps the allowlisted debugger boundary (evaluate is scoped)", () => {
     // No arbitrary CDP surface: MCP/Service/Engine never accept CDP method
     // strings; the extension sends a fixed allowlist only.
-    const engine = stripComments(readSource("src/browser/extension/ArcExtensionEngine.ts"));
+    const engine = stripComments(readSource("src/browser/extension/ExtensionEngine.ts"));
     for (const token of ["Accessibility", "DOM.describeNode", "sendCommand", "cdp.send"]) {
-      expect(engine, `ArcExtensionEngine must not contain ${token}`).not.toContain(token);
+      expect(engine, `ExtensionEngine must not contain ${token}`).not.toContain(token);
     }
     const service = stripComments(readSource("src/browser/BrowserService.ts"));
     for (const token of ["Accessibility", "Runtime.evaluate", "sendCommand"]) {
@@ -486,9 +494,9 @@ describe("navigation boundaries", () => {
       }
     }
     // Engine never touches CDP method strings; the tools register only observability names.
-    const engine = stripComments(readSource("src/browser/extension/ArcExtensionEngine.ts"));
+    const engine = stripComments(readSource("src/browser/extension/ExtensionEngine.ts"));
     for (const token of ["Runtime.enable", "Network.enable", "sendCommand", "Accessibility", "DOM.describeNode"]) {
-      expect(engine, `ArcExtensionEngine must not contain ${token}`).not.toContain(token);
+      expect(engine, `ExtensionEngine must not contain ${token}`).not.toContain(token);
     }
     const runtime = stripComments(readSource("src/browser/extension/BridgeRuntime.ts"));
     for (const method of [
@@ -520,7 +528,7 @@ describe("navigation boundaries", () => {
       "src/server/server.ts",
       "src/server/tools/observability.ts",
       "src/browser/BrowserService.ts",
-      "src/browser/extension/ArcExtensionEngine.ts",
+      "src/browser/extension/ExtensionEngine.ts",
     ]) {
       const code = stripComments(readSource(file));
       expect(code).not.toContain("browser_console_clear");

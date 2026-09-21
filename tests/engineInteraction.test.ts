@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { BridgeError } from "../src/bridge/BridgeError.js";
 import type { BridgeTransportMethod } from "../src/browser/extension/BridgeRuntime.js";
 import { BridgeRuntime } from "../src/browser/extension/BridgeRuntime.js";
-import { ArcExtensionEngine } from "../src/browser/extension/ArcExtensionEngine.js";
+
+import { arcSpec } from "../src/browser/chromium/spec.js";
+import { ExtensionEngine } from "../src/browser/extension/ExtensionEngine.js";
 import { BrowserService } from "../src/browser/BrowserService.js";
-import { ArcError } from "../src/errors/ArcError.js";
+import { BrowserError } from "../src/errors/BrowserError.js";
 import { INTERACTION_TEXT_LIMIT_BYTES } from "../src/browser/interactionPolicy.js";
 import type { BrowserTab } from "../src/browser/models.js";
 
@@ -99,9 +101,10 @@ class FakeInteractionRuntime extends BridgeRuntime {
   }
 }
 
-function harness(): { engine: ArcExtensionEngine; runtime: FakeInteractionRuntime } {
+function harness(): { engine: ExtensionEngine; runtime: FakeInteractionRuntime } {
   const runtime = new FakeInteractionRuntime();
-  const engine = new ArcExtensionEngine({
+  const engine = new ExtensionEngine({
+      spec: arcSpec(),
     runtime,
     extensionId: EXTENSION_ID,
     connectTimeoutMs: 2_000,
@@ -114,8 +117,8 @@ async function catchCode(action: () => Promise<unknown>): Promise<string> {
   try {
     await action();
   } catch (error: unknown) {
-    expect(error).toBeInstanceOf(ArcError);
-    return (error as ArcError).code;
+    expect(error).toBeInstanceOf(BrowserError);
+    return (error as BrowserError).code;
   }
   throw new Error("expected action to throw");
 }

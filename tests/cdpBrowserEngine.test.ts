@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { ArcError } from "../src/errors/ArcError.js";
-import type { ArcLaunchConfig } from "../src/browser/arc/ArcLaunchConfig.js";
-import { ArcLauncher } from "../src/browser/arc/ArcLauncher.js";
+import { BrowserError } from "../src/errors/BrowserError.js";
+import type { ChromiumLaunchConfig } from "../src/browser/chromium/launchConfig.js";
+import { BrowserLauncher } from "../src/browser/chromium/launcher.js";
 import { BrowserService } from "../src/browser/BrowserService.js";
 import { CdpBrowserEngine } from "../src/browser/cdp/CdpBrowserEngine.js";
 import { CdpConnection } from "../src/browser/cdp/CdpConnection.js";
+import { arcSpec } from "../src/browser/chromium/spec.js";
 import type { CdpVersionInfo } from "../src/browser/cdp/CdpReadiness.js";
 
-const FAKE_CONFIG: ArcLaunchConfig = {
+const FAKE_CONFIG: ChromiumLaunchConfig = {
   executablePath: "C:\\Arc\\Arc.exe",
   profilePath: "C:\\arc-mcp-test\\profile",
   debugPort: 9333,
@@ -20,7 +21,7 @@ const FAKE_VERSION: CdpVersionInfo = {
   webSocketDebuggerUrl: "ws://127.0.0.1:9333/devtools/browser/x",
 };
 
-class FakeLauncher extends ArcLauncher {
+class FakeLauncher extends BrowserLauncher {
   launched = false;
   shutdownCalls = 0;
   running = true;
@@ -104,7 +105,7 @@ function harness(): Harness {
   const launcher = new FakeLauncher();
   const connection = new FakeConnection();
   const engine = new CdpBrowserEngine(
-    { executablePath: undefined, profilePath: undefined, debugPort: 9333 },
+    { spec: arcSpec(), executablePath: undefined, profilePath: undefined, debugPort: 9333 },
     {
       discover: () =>
         Promise.resolve({
@@ -139,13 +140,13 @@ describe("CdpBrowserEngine lifecycle", () => {
     const launcher = new FakeLauncher();
     const connection = new FakeConnection();
     const failing = new CdpBrowserEngine(
-      { executablePath: undefined, profilePath: undefined, debugPort: 9333 },
+      { spec: arcSpec(), executablePath: undefined, profilePath: undefined, debugPort: 9333 },
       {
         discover: () =>
           Promise.resolve({ executablePath: FAKE_CONFIG.executablePath, source: "explicit" as const }),
         createLauncher: () => launcher,
         createConnection: () => connection,
-        waitReady: () => Promise.reject(new ArcError("ARC_CDP_READY_TIMEOUT", "timeout", {})),
+        waitReady: () => Promise.reject(new BrowserError("BROWSER_CDP_READY_TIMEOUT", "timeout", {})),
       },
     );
     let caught: unknown = null;
@@ -154,12 +155,12 @@ describe("CdpBrowserEngine lifecycle", () => {
     } catch (error: unknown) {
       caught = error;
     }
-    expect(caught).toBeInstanceOf(ArcError);
-    expect((caught as ArcError).code).toBe("ARC_CDP_READY_TIMEOUT");
+    expect(caught).toBeInstanceOf(BrowserError);
+    expect((caught as BrowserError).code).toBe("BROWSER_CDP_READY_TIMEOUT");
     const status = await failing.status();
     expect(status.state).toBe("error");
     expect(status.connected).toBe(false);
-    expect(status.lastErrorCode).toBe("ARC_CDP_READY_TIMEOUT");
+    expect(status.lastErrorCode).toBe("BROWSER_CDP_READY_TIMEOUT");
     expect(launcher.shutdownCalls).toBe(1);
     expect(connection.released).toBe(true);
   });
@@ -198,7 +199,7 @@ describe("CdpBrowserEngine lifecycle", () => {
   it("reports connecting while startup is in flight", async () => {
     let observed: string | null = null;
     const slow: CdpBrowserEngine = new CdpBrowserEngine(
-      { executablePath: undefined, profilePath: undefined, debugPort: 9333 },
+      { spec: arcSpec(), executablePath: undefined, profilePath: undefined, debugPort: 9333 },
       {
         discover: () =>
           Promise.resolve({ executablePath: FAKE_CONFIG.executablePath, source: "explicit" as const }),
@@ -236,9 +237,9 @@ describe("CdpBrowserEngine future operations", () => {
       } catch (error: unknown) {
         caught = error;
       }
-      expect(caught).toBeInstanceOf(ArcError);
-      expect((caught as ArcError).code).toBe("BROWSER_OPERATION_NOT_IMPLEMENTED");
-      expect((caught as ArcError).details["operation"]).toBe(operation);
+      expect(caught).toBeInstanceOf(BrowserError);
+      expect((caught as BrowserError).code).toBe("BROWSER_OPERATION_NOT_IMPLEMENTED");
+      expect((caught as BrowserError).details["operation"]).toBe(operation);
     }
   });
 });

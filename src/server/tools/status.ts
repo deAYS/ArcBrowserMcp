@@ -6,7 +6,7 @@ export const BrowserStatusSchema = z.object({
   connected: z.boolean(),
   state: z.enum(["disconnected", "connecting", "connected", "error"]),
   backend: z.enum(["none", "cdp", "extension"]),
-  profileMode: z.enum(["dedicated-mcp-profile", "normal-running-arc"]),
+  profileMode: z.enum(["dedicated-mcp-profile", "normal-running-session"]),
   selectedTabId: z.string().nullable(),
   reason: z.string().optional(),
   cdpPort: z.number().optional(),

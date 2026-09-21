@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "description": "MCP server for inspecting and controlling web content in Arc Browser on Windows.",
+  "description": "MCP server for inspecting and controlling web content in Chromium browsers (Arc, Chrome) on Windows.",
   "repository": {
     "type": "git",
     "url": "https://github.com/deAYS/ArcBrowserMcp.git"
@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:arc": "vitest run --config vitest.arc.config.ts",
+    "test:chrome": "vitest run --config vitest.chrome.config.ts",
     "test:extension-engine": "vitest run --config vitest.extension-engine.config.ts",
     "test:tabs": "vitest run --config vitest.tabs.config.ts",
     "test:navigation": "vitest run --config vitest.navigation.config.ts",

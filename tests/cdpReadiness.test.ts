@@ -1,6 +1,6 @@
 import * as net from "node:net";
 import { describe, expect, it } from "vitest";
-import { ArcError } from "../src/errors/ArcError.js";
+import { BrowserError } from "../src/errors/BrowserError.js";
 import type { CdpFetch } from "../src/browser/cdp/CdpReadiness.js";
 import { isTcpPortOccupied, waitForCdpReady } from "../src/browser/cdp/CdpReadiness.js";
 
@@ -62,7 +62,7 @@ describe("waitForCdpReady", () => {
     expect(calls).toBeGreaterThanOrEqual(1);
   });
 
-  it("times out with ARC_CDP_READY_TIMEOUT and reports the last error", async () => {
+  it("times out with BROWSER_CDP_READY_TIMEOUT and reports the last error", async () => {
     let caught: unknown = null;
     try {
       await waitForCdpReady(9334, {
@@ -74,12 +74,12 @@ describe("waitForCdpReady", () => {
     } catch (error: unknown) {
       caught = error;
     }
-    expect(caught).toBeInstanceOf(ArcError);
-    expect((caught as ArcError).code).toBe("ARC_CDP_READY_TIMEOUT");
-    expect((caught as ArcError).details["lastError"] ?? "").toContain("ECONNREFUSED");
+    expect(caught).toBeInstanceOf(BrowserError);
+    expect((caught as BrowserError).code).toBe("BROWSER_CDP_READY_TIMEOUT");
+    expect((caught as BrowserError).details["lastError"] ?? "").toContain("ECONNREFUSED");
   });
 
-  it("aborts with ARC_PROCESS_EXITED_EARLY when the owned process is gone", async () => {
+  it("aborts with BROWSER_PROCESS_EXITED_EARLY when the owned process is gone", async () => {
     let caught: unknown = null;
     try {
       await waitForCdpReady(9334, {
@@ -93,8 +93,8 @@ describe("waitForCdpReady", () => {
     } catch (error: unknown) {
       caught = error;
     }
-    expect(caught).toBeInstanceOf(ArcError);
-    expect((caught as ArcError).code).toBe("ARC_PROCESS_EXITED_EARLY");
+    expect(caught).toBeInstanceOf(BrowserError);
+    expect((caught as BrowserError).code).toBe("BROWSER_PROCESS_EXITED_EARLY");
   });
 });
 

@@ -98,7 +98,7 @@ describe("final static security audit", () => {
       "extension/src/tabs.ts",
       "extension/src/bridge.ts",
       "extension/src/diagnostics.ts",
-      "src/browser/extension/ArcExtensionEngine.ts",
+      "src/browser/extension/ExtensionEngine.ts",
       "src/browser/extension/BridgeRuntime.ts",
       "src/browser/BrowserService.ts",
       "src/server/tools/observability.ts",
@@ -196,8 +196,8 @@ describe("final static security audit", () => {
   });
 
   it("pins native host identity: name, registry key, origin, and extension ID", () => {
-    expect(NATIVE_HOST_NAME).toBe("com.arc_mcp.bridge");
-    expect(NATIVE_HOST_REGISTRY_KEY).toBe("HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.arc_mcp.bridge");
+    expect(NATIVE_HOST_NAME).toBe("com.BROWSER_mcp.bridge");
+    expect(NATIVE_HOST_REGISTRY_KEY).toBe("HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.BROWSER_mcp.bridge");
     const identity = JSON.parse(readSource("extension/identity.json")) as { publicKey?: unknown };
     expect(typeof identity.publicKey).toBe("string");
     const id = extensionIdFromPublicKeyBase64(identity.publicKey as string);

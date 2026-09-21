@@ -5,7 +5,7 @@ import { defaultSessionDir, BRIDGE_SESSION_FILE_NAME } from "../session.js";
 import { fileSessionLoader, runHost } from "./host.js";
 
 /**
- * Native host process entry (launched by Arc via the generated .cmd).
+ * Native host process entry (launched by the browser via the generated .cmd).
  * stdout carries Native Messaging frames only; every diagnostic goes to
  * stderr. Resolves paths from this checkout: repo root is three levels
  * above dist/bridge/native-host/.

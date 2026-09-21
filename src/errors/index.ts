@@ -1,2 +1,2 @@
-export { ArcError, arcNotFound, invalidArcExecutablePath, unsafeProfilePath } from "./ArcError.js";
-export type { ArcErrorCode } from "./ArcError.js";
+export { BrowserError, browserNotFound, invalidExecutablePath, unsafeProfilePath } from "./BrowserError.js";
+export type { BrowserErrorCode } from "./BrowserError.js";

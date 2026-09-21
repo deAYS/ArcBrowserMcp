@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 
-// Live integration against the real dedicated Arc instance.
-process.env["ARC_MCP_TEST_BROWSER"] ??= "arc";
+// Live integration against the real dedicated Google Chrome instance.
+process.env["ARC_MCP_TEST_BROWSER"] = "chrome";
 
 export default defineConfig({
   test: {

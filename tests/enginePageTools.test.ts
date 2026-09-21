@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { BridgeError } from "../src/bridge/BridgeError.js";
 import type { BridgeTransportMethod } from "../src/browser/extension/BridgeRuntime.js";
 import { BridgeRuntime } from "../src/browser/extension/BridgeRuntime.js";
-import { ArcExtensionEngine } from "../src/browser/extension/ArcExtensionEngine.js";
-import { ArcError } from "../src/errors/ArcError.js";
+
+import { arcSpec } from "../src/browser/chromium/spec.js";
+import { ExtensionEngine } from "../src/browser/extension/ExtensionEngine.js";
+import { BrowserError } from "../src/errors/BrowserError.js";
 import { EVALUATE_EXPRESSION_LIMIT_BYTES } from "../src/browser/pageToolsPolicy.js";
 import type { BrowserTab } from "../src/browser/models.js";
 
@@ -90,7 +92,7 @@ class FakePageRuntime extends BridgeRuntime {
   }
 }
 
-function harness(): { engine: ArcExtensionEngine; runtime: FakePageRuntime } {
+function harness(): { engine: ExtensionEngine; runtime: FakePageRuntime } {
   const runtime = new FakePageRuntime();
   runtime.handler = (method) => {
     if (method === "runtime.evaluate") {
@@ -101,7 +103,8 @@ function harness(): { engine: ArcExtensionEngine; runtime: FakePageRuntime } {
     }
     return { matched: true, observed: "" };
   };
-  const engine = new ArcExtensionEngine({
+  const engine = new ExtensionEngine({
+      spec: arcSpec(),
     runtime,
     extensionId: EXTENSION_ID,
     connectTimeoutMs: 2_000,
@@ -110,7 +113,7 @@ function harness(): { engine: ArcExtensionEngine; runtime: FakePageRuntime } {
   return { engine, runtime };
 }
 
-async function connectSelected(): Promise<{ engine: ArcExtensionEngine; runtime: FakePageRuntime }> {
+async function connectSelected(): Promise<{ engine: ExtensionEngine; runtime: FakePageRuntime }> {
   const h = harness();
   await h.engine.connect();
   await h.engine.selectTab(TAB_A);
@@ -122,8 +125,8 @@ async function catchCode(action: () => Promise<unknown>): Promise<string> {
   try {
     await action();
   } catch (error: unknown) {
-    expect(error).toBeInstanceOf(ArcError);
-    return (error as ArcError).code;
+    expect(error).toBeInstanceOf(BrowserError);
+    return (error as BrowserError).code;
   }
   throw new Error("expected action to throw");
 }
@@ -306,7 +309,7 @@ describe("engine waitFor gating, stability, and mapping", () => {
     try {
       await engine.waitFor({ type: "text", value: sentinel, timeoutMs: 120 });
     } catch (error: unknown) {
-      code = error instanceof ArcError ? error.code : "WRONG_TYPE";
+      code = error instanceof BrowserError ? error.code : "WRONG_TYPE";
       message = error instanceof Error ? error.message : String(error);
     }
     expect(code).toBe("BROWSER_WAIT_TIMEOUT");

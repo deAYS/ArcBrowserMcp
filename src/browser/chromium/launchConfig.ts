@@ -1,37 +1,38 @@
 import * as path from "node:path";
 import { ConfigError } from "../../config/config.js";
-import { assertSafeProfilePath, resolveProfilePath } from "./ArcProfile.js";
+import { assertSafeProfilePath, resolveProfilePath } from "./profile.js";
 
 /**
- * Arc launch configuration builder (data only).
+ * Chromium launch configuration builder (data only).
  *
  * Constructs and validates the configuration; it never
- * spawns a process.
+ * spawns a process. The flag set is standard Chromium and works for
+ * Arc, Chrome, and future Chromium-based browsers alike.
  */
 
-export interface ArcLaunchConfigInput {
+export interface ChromiumLaunchConfigInput {
   readonly executablePath: string;
   readonly profilePath: string;
   readonly debugPort: number;
   readonly extraArgs?: readonly string[];
-  /** Known Arc install/package dirs; the profile must avoid them. */
-  readonly arcInstallDirs?: readonly string[];
+  /** Known browser install/package dirs; the profile must avoid them. */
+  readonly installDirs?: readonly string[];
 }
 
-export interface ArcLaunchConfig {
+export interface ChromiumLaunchConfig {
   readonly executablePath: string;
   readonly profilePath: string;
   readonly debugPort: number;
   readonly args: readonly string[];
 }
 
-export function buildArcLaunchConfig(input: ArcLaunchConfigInput): ArcLaunchConfig {
+export function buildChromiumLaunchConfig(input: ChromiumLaunchConfigInput): ChromiumLaunchConfig {
   if (!Number.isInteger(input.debugPort) || input.debugPort < 1 || input.debugPort > 65535) {
     throw new ConfigError(`Invalid debug port: ${JSON.stringify(input.debugPort)}. Expected integer 1-65535.`);
   }
   const profilePath = resolveProfilePath(input.profilePath);
-  const arcInstallDirs = [path.dirname(path.resolve(input.executablePath)), ...(input.arcInstallDirs ?? [])];
-  assertSafeProfilePath(profilePath, { arcInstallDirs });
+  const installDirs = [path.dirname(path.resolve(input.executablePath)), ...(input.installDirs ?? [])];
+  assertSafeProfilePath(profilePath, { installDirs });
   return {
     executablePath: path.resolve(input.executablePath),
     profilePath,

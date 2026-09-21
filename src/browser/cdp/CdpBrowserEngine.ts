@@ -1,10 +1,11 @@
-import type { ArcLaunchConfig } from "../arc/ArcLaunchConfig.js";
-import { buildArcLaunchConfig } from "../arc/ArcLaunchConfig.js";
-import { ArcLauncher } from "../arc/ArcLauncher.js";
-import { discoverArcExecutable } from "../arc/ArcDiscovery.js";
-import type { ArcDiscoveryResult } from "../arc/ArcDiscovery.js";
-import { resolveMcpProfilePath } from "../arc/ArcProfile.js";
-import { ArcError, browserOperationNotImplemented } from "../../errors/ArcError.js";
+import type { ChromiumLaunchConfig } from "../chromium/launchConfig.js";
+import { buildChromiumLaunchConfig } from "../chromium/launchConfig.js";
+import { BrowserLauncher } from "../chromium/launcher.js";
+import { discoverExecutable } from "../chromium/discovery.js";
+import type { DiscoveryResult } from "../chromium/discovery.js";
+import { resolveMcpProfilePath } from "../chromium/profile.js";
+import type { BrowserSpec } from "../chromium/spec.js";
+import { BrowserError, browserOperationNotImplemented } from "../../errors/BrowserError.js";
 import type { BrowserEngine } from "../BrowserEngine.js";
 import type {
   BrowserStatus,
@@ -31,6 +32,8 @@ import { DEFAULT_READINESS_OPTIONS, waitForCdpReady } from "./CdpReadiness.js";
 import type { CdpVersionInfo } from "./CdpReadiness.js";
 
 export interface CdpEngineOptions {
+  /** Which browser this engine targets (data-driven discovery/launch). */
+  readonly spec: BrowserSpec;
   /** Explicit executable override; undefined means auto-discover at connect(). */
   readonly executablePath: string | undefined;
   /** Explicit profile override; undefined means the stable per-user default. */
@@ -40,8 +43,8 @@ export interface CdpEngineOptions {
 }
 
 export interface CdpEngineDeps {
-  readonly discover?: (explicitPath: string | undefined) => Promise<ArcDiscoveryResult>;
-  readonly createLauncher?: (config: ArcLaunchConfig) => ArcLauncher;
+  readonly discover?: (explicitPath: string | undefined) => Promise<DiscoveryResult>;
+  readonly createLauncher?: (config: ChromiumLaunchConfig) => BrowserLauncher;
   readonly createConnection?: () => CdpConnection;
   readonly waitReady?: (port: number, isAlive: () => boolean, describeExit: () => string) => Promise<CdpVersionInfo>;
 }
@@ -49,7 +52,7 @@ export interface CdpEngineDeps {
 const GRACEFUL_CLOSE_TIMEOUT_MS = 10_000;
 
 /**
- * BrowserEngine backend for the dedicated Arc process over CDP.
+ * BrowserEngine backend for a dedicated Chromium-browser process over CDP.
  *
  * Owns launcher, readiness, and connection lifecycle. Only connect,
  * disconnect, and status are functional; every other operation is an
@@ -58,9 +61,9 @@ const GRACEFUL_CLOSE_TIMEOUT_MS = 10_000;
  */
 export class CdpBrowserEngine implements BrowserEngine {
   private state: "disconnected" | "connecting" | "connected" | "error" = "disconnected";
-  private launcher: ArcLauncher | null = null;
+  private launcher: BrowserLauncher | null = null;
   private connection: CdpConnection | null = null;
-  private launchConfig: ArcLaunchConfig | null = null;
+  private launchConfig: ChromiumLaunchConfig | null = null;
   private discoverySource: string | null = null;
   private lastErrorCode: string | null = null;
 
@@ -84,17 +87,20 @@ export class CdpBrowserEngine implements BrowserEngine {
         this.deps.discover ??
         ((explicitPath: string | undefined) =>
           explicitPath === undefined
-            ? discoverArcExecutable({})
-            : discoverArcExecutable({ explicitPath }));
+            ? discoverExecutable(this.options.spec, {})
+            : discoverExecutable(this.options.spec, { explicitPath }));
       const discovery = await discover(this.options.executablePath);
-      const profilePath = resolveMcpProfilePath(this.options.profilePath);
-      const config = buildArcLaunchConfig({
+      const profilePath = resolveMcpProfilePath(
+        this.options.profilePath,
+        this.options.spec.profileDirName,
+      );
+      const config = buildChromiumLaunchConfig({
         executablePath: discovery.executablePath,
         profilePath,
         debugPort: this.options.debugPort,
-        arcInstallDirs: discovery.installLocation === undefined ? [] : [discovery.installLocation],
+        installDirs: discovery.installLocation === undefined ? [] : [discovery.installLocation],
       });
-      const createLauncher = this.deps.createLauncher ?? ((c: ArcLaunchConfig) => new ArcLauncher(c));
+      const createLauncher = this.deps.createLauncher ?? ((c: ChromiumLaunchConfig) => new BrowserLauncher(c));
       const launcher = createLauncher(config);
       this.launcher = launcher;
       await launcher.launch();
@@ -120,7 +126,7 @@ export class CdpBrowserEngine implements BrowserEngine {
       this.discoverySource = discovery.source;
       this.state = "connected";
     } catch (error: unknown) {
-      this.lastErrorCode = error instanceof ArcError ? error.code : "ARC_LAUNCH_FAILED";
+      this.lastErrorCode = error instanceof BrowserError ? error.code : "BROWSER_LAUNCH_FAILED";
       this.state = "error";
       await this.cleanupOwned();
       throw error;
@@ -148,7 +154,7 @@ export class CdpBrowserEngine implements BrowserEngine {
     }
   }
 
-  /** PID of the owned dedicated Arc process, or null when none is running. */
+  /** PID of the owned dedicated browser process, or null when none is running. */
   getOwnedPid(): number | null {
     return this.launcher?.pid ?? null;
   }

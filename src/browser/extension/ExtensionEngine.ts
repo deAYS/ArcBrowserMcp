@@ -2,6 +2,7 @@ import { BridgeError } from "../../bridge/BridgeError.js";
 import { BRIDGE_PROTOCOL_VERSION } from "../../bridge/protocol.js";
 import { checkBridgePrerequisites } from "../../bridge/preflight.js";
 import type { PrerequisiteIssue } from "../../bridge/preflight.js";
+import type { BrowserSpec } from "../chromium/spec.js";
 import {
   browserDebuggerUnavailable,
   browserElementNotEditable,
@@ -28,8 +29,8 @@ import {
   browserUrlNotAllowed,
   browserWaitAborted,
   browserWaitTimeout,
-} from "../../errors/ArcError.js";
-import { ArcError } from "../../errors/ArcError.js";
+} from "../../errors/BrowserError.js";
+import { BrowserError } from "../../errors/BrowserError.js";
 import { validateNavigationUrl } from "../navigationPolicy.js";
 import { INTERACTION_TEXT_LIMIT_BYTES, parsePressKey, utf8ByteLength } from "../interactionPolicy.js";
 import {
@@ -84,7 +85,9 @@ import type {
 } from "../models.js";
 import type { BridgeRuntime } from "./BridgeRuntime.js";
 
-export interface ArcExtensionEngineOptions {
+export interface ExtensionEngineOptions {
+  /** Which browser this engine targets (messaging + scheme policy only). */
+  readonly spec: BrowserSpec;
   readonly runtime: BridgeRuntime;
   readonly extensionId: string;
   readonly connectTimeoutMs?: number;
@@ -102,8 +105,8 @@ const DEFAULT_OPERATION_TIMEOUT_MS = 15_000;
 // ms, so a full-timeout block means the worker suspended again.
 const FIRST_VERIFY_TIMEOUT_MS = 5_000;
 
-/** Schemes that must never be opened/created. */
-const BLOCKED_CREATE_SCHEMES = ["javascript:", "data:", "file:", "chrome:", "chrome-extension:", "arc:", "devtools:", "view-source:"];
+/** Schemes that must never be opened/created, for every browser. */
+const BASE_BLOCKED_CREATE_SCHEMES = ["javascript:", "data:", "file:", "chrome:", "chrome-extension:", "devtools:", "view-source:"];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -206,13 +209,15 @@ function asBrowserTab(value: unknown): BrowserTab {
 }
 
 /**
- * Primary Windows backend: drives the normal running Arc session through
- * the bridge (extension <- native host <- named pipe).
+ * Primary Windows backend: drives the normal running browser session
+ * through the bridge (extension <- native host <- named pipe).
  *
  * Owns only the MCP side (pipe server, session descriptor, engine
- * lifetime). Never launches Arc, the native host, or anything browser-side.
+ * lifetime). Never launches the browser, the native host, or anything
+ * browser-side. Works for any Chromium browser with the bridge extension
+ * loaded (Arc, Chrome, ...).
  */
-export class ArcExtensionEngine implements BrowserEngine {
+export class ExtensionEngine implements BrowserEngine {
   private state: "disconnected" | "connecting" | "connected" | "error" = "disconnected";
   private lastErrorCode: string | null = null;
   private connectPromise: Promise<void> | null = null;
@@ -225,7 +230,7 @@ export class ArcExtensionEngine implements BrowserEngine {
   // Failures are never cached — a later bridge:install must be picked up.
   private preflightPassed = false;
 
-  constructor(private readonly options: ArcExtensionEngineOptions) {}
+  constructor(private readonly options: ExtensionEngineOptions) {}
 
   private get runtime(): BridgeRuntime {
     return this.options.runtime;
@@ -244,8 +249,8 @@ export class ArcExtensionEngine implements BrowserEngine {
   }
 
   /** Map a bridge-side navigation failure to the project error taxonomy. */
-  private navigationFailure(selectedTabId: TabId, operation: string, error: unknown): ArcError {
-    if (error instanceof ArcError) {
+  private navigationFailure(selectedTabId: TabId, operation: string, error: unknown): BrowserError {
+    if (error instanceof BrowserError) {
       return error;
     }
     const remoteCode =
@@ -289,8 +294,8 @@ export class ArcExtensionEngine implements BrowserEngine {
   }
 
   /** Map a bridge-side tab failure to the project error taxonomy. */
-  private tabFailure(operation: "select" | "open" | "close" | "list", tabId: string | null, error: unknown): ArcError {
-    if (error instanceof ArcError) {
+  private tabFailure(operation: "select" | "open" | "close" | "list", tabId: string | null, error: unknown): BrowserError {
+    if (error instanceof BrowserError) {
       return error;
     }
     const remoteCode =
@@ -306,7 +311,7 @@ export class ArcExtensionEngine implements BrowserEngine {
     if (operation === "close" && tabId !== null) {
       return browserTabCloseFailed(tabId, error);
     }
-    return new ArcError(
+    return new BrowserError(
       "BROWSER_TAB_NOT_FOUND",
       `Tab operation ${operation} failed: ${error instanceof Error ? error.message : String(error)}.`,
       {},
@@ -433,7 +438,7 @@ export class ArcExtensionEngine implements BrowserEngine {
         reject(
           new BridgeError(
             "EXTENSION_CONNECT_TIMEOUT",
-            `no authenticated extension relay within ${String(timeoutMs)}ms; is Arc running with the bridge extension loaded?`,
+            `no authenticated extension relay within ${String(timeoutMs)}ms; is ${this.options.spec.displayName} running with the bridge extension loaded?`,
           ),
         );
       }, timeoutMs);
@@ -498,7 +503,7 @@ export class ArcExtensionEngine implements BrowserEngine {
       connected,
       state,
       backend: "extension",
-      profileMode: "normal-running-arc",
+      profileMode: "normal-running-session",
       selectedTabId: this.selectedTabId,
     };
     if (state === "connecting") {
@@ -554,7 +559,7 @@ export class ArcExtensionEngine implements BrowserEngine {
   async openTab(url?: string): Promise<BrowserTab> {
     if (url !== undefined && url.trim() !== "" && url.trim().toLowerCase() !== "about:blank") {
       const normalized = url.trim().toLowerCase();
-      if (BLOCKED_CREATE_SCHEMES.some((scheme) => normalized.startsWith(scheme))) {
+      if ([...BASE_BLOCKED_CREATE_SCHEMES, ...this.options.spec.blockedCreateSchemes].some((scheme) => normalized.startsWith(scheme))) {
         throw browserTabCreateFailed(`refused dangerous URL scheme in ${JSON.stringify(url)}`);
       }
     }
@@ -674,7 +679,7 @@ export class ArcExtensionEngine implements BrowserEngine {
     try {
       tabs = await this.listTabs();
     } catch (error: unknown) {
-      if (error instanceof ArcError && error.code === "BROWSER_TAB_NOT_FOUND") {
+      if (error instanceof BrowserError && error.code === "BROWSER_TAB_NOT_FOUND") {
         this.selectedTabId = null;
         throw browserTabNotFound(selectedTabId);
       }
@@ -726,8 +731,8 @@ export class ArcExtensionEngine implements BrowserEngine {
   }
 
   /** Map a bridge-side snapshot failure to the project error taxonomy. */
-  private snapshotFailure(selectedTabId: TabId, error: unknown): ArcError {
-    if (error instanceof ArcError) {
+  private snapshotFailure(selectedTabId: TabId, error: unknown): BrowserError {
+    if (error instanceof BrowserError) {
       return error;
     }
     const remoteCode =
@@ -1075,8 +1080,8 @@ export class ArcExtensionEngine implements BrowserEngine {
    * Fixed safe messages only: the expression source is never echoed, and
    * page-thrown data (which may itself be sensitive) is never surfaced.
    */
-  private evaluateFailure(selectedTabId: TabId, timeoutMs: number, error: unknown): ArcError {
-    if (error instanceof ArcError) {
+  private evaluateFailure(selectedTabId: TabId, timeoutMs: number, error: unknown): BrowserError {
+    if (error instanceof BrowserError) {
       return error;
     }
     const remoteCode =
@@ -1166,8 +1171,8 @@ export class ArcExtensionEngine implements BrowserEngine {
   }
 
   /** Map a bridge-side screenshot failure to the project taxonomy. */
-  private screenshotFailure(selectedTabId: TabId, error: unknown): ArcError {
-    if (error instanceof ArcError) {
+  private screenshotFailure(selectedTabId: TabId, error: unknown): BrowserError {
+    if (error instanceof BrowserError) {
       return error;
     }
     const remoteCode =
@@ -1337,8 +1342,8 @@ export class ArcExtensionEngine implements BrowserEngine {
    * Map a bridge-side wait failure to the project taxonomy. Condition text
    * is never echoed: length-only / code-only messages.
    */
-  private waitFailure(selectedTabId: TabId, label: string, error: unknown): ArcError {
-    if (error instanceof ArcError) {
+  private waitFailure(selectedTabId: TabId, label: string, error: unknown): BrowserError {
+    if (error instanceof BrowserError) {
       return error;
     }
     const remoteCode =
@@ -1378,7 +1383,7 @@ export class ArcExtensionEngine implements BrowserEngine {
     try {
       tabs = await this.listTabs();
     } catch (error: unknown) {
-      if (error instanceof ArcError && error.code === "BROWSER_TAB_NOT_FOUND") {
+      if (error instanceof BrowserError && error.code === "BROWSER_TAB_NOT_FOUND") {
         this.selectedTabId = null;
         throw browserTabNotFound(selectedTabId);
       }
@@ -1409,8 +1414,8 @@ export class ArcExtensionEngine implements BrowserEngine {
    * Secret-bearing payloads are never echoed: length-only / code-only
    * messages only. Stale refs fail closed; debugger conflicts never steal.
    */
-  private interactionFailure(selectedTabId: TabId, operation: string, error: unknown): ArcError {
-    if (error instanceof ArcError) {
+  private interactionFailure(selectedTabId: TabId, operation: string, error: unknown): BrowserError {
+    if (error instanceof BrowserError) {
       return error;
     }
     const remoteCode =
@@ -1861,8 +1866,8 @@ export class ArcExtensionEngine implements BrowserEngine {
    * Fixed safe messages only: headers, URLs, console payloads, and event
    * bodies never flow through here (length/code info only).
    */
-  private observabilityFailure(selectedTabId: TabId, operation: string, error: unknown): ArcError {
-    if (error instanceof ArcError) {
+  private observabilityFailure(selectedTabId: TabId, operation: string, error: unknown): BrowserError {
+    if (error instanceof BrowserError) {
       return error;
     }
     const remoteCode =

@@ -4,21 +4,26 @@ import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { discoverArcExecutable } from "../../src/browser/arc/ArcDiscovery.js";
-import { resolveMcpProfilePath } from "../../src/browser/arc/ArcProfile.js";
+import { discoverExecutable } from "../../src/browser/chromium/discovery.js";
+import { browserSpec } from "../../src/browser/chromium/spec.js";
+import type { BrowserId } from "../../src/config/config.js";
+import { resolveMcpProfilePath } from "../../src/browser/chromium/profile.js";
 import { CdpBrowserEngine } from "../../src/browser/cdp/CdpBrowserEngine.js";
 import { cdpVersionUrl } from "../../src/browser/cdp/CdpReadiness.js";
 
 /**
- * Real Windows Arc integration. Explicit opt-in via `pnpm test:arc`;
- * never runs under plain `pnpm test`.
+ * Real Windows browser integration for one supported browser, selected by
+ * ARC_MCP_TEST_BROWSER=arc|chrome (default arc). Explicit opt-in via
+ * `pnpm test:browser`; never runs under plain `pnpm test`.
  *
  * Uses a temporary per-run profile under os.tmpdir() and an ephemeral
- * loopback port. Never touches %LOCALAPPDATA%\\arc-mcp\\profile or the
- * user's normal Arc profile. Only terminates the Arc instance this test
- * launched; pre-existing Arc processes must remain alive.
+ * loopback port. Never touches %LOCALAPPDATA%\arc-mcp\profile* or the
+ * user's normal browser profile. Only terminates the browser instance
+ * this test launched; pre-existing browser processes must remain alive.
  */
 
+const TEST_BROWSER = (process.env["ARC_MCP_TEST_BROWSER"]?.trim().toLowerCase() ?? "arc") as BrowserId;
+const SPEC = browserSpec(TEST_BROWSER);
 const PROBE_TIMEOUT_MS = 30_000;
 
 function runPowerShell(script: string): Promise<string> {
@@ -38,10 +43,10 @@ function runPowerShell(script: string): Promise<string> {
   });
 }
 
-/** Read-only snapshot of running Arc PIDs for later no-harm verification. */
-async function runningArcPids(): Promise<number[]> {
+/** Read-only snapshot of running browser PIDs for later no-harm verification. */
+async function runningBrowserPids(): Promise<number[]> {
   const output = await runPowerShell(
-    "Get-Process -Name 'Arc' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id",
+    `Get-Process -Name '${SPEC.processName}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id`,
   );
   return output
     .split(/\r?\n/)
@@ -112,7 +117,7 @@ afterAll(async () => {
     try {
       await ownedEngine.disconnect();
     } catch (error: unknown) {
-      process.stderr.write(`arc-integration cleanup disconnect failed: ${String(error)}\n`);
+      process.stderr.write(`browser-integration cleanup disconnect failed: ${String(error)}\n`);
     }
     ownedEngine = null;
   }
@@ -120,27 +125,28 @@ afterAll(async () => {
     try {
       await rm(tempProfile, { recursive: true, force: true });
     } catch (error: unknown) {
-      process.stderr.write(`arc-integration cleanup rm failed: ${String(error)}\n`);
+      process.stderr.write(`browser-integration cleanup rm failed: ${String(error)}\n`);
     }
     tempProfile = null;
   }
 });
 
-describe("real dedicated Arc over CDP", () => {
+describe(`real dedicated ${SPEC.displayName} over CDP`, () => {
   it(
-    "discovers, launches isolated Arc, connects, verifies, and shuts down cleanly",
+    "discovers, launches isolated browser, connects, verifies, and shuts down cleanly",
     async () => {
-      const preexistingPids = await runningArcPids();
+      const preexistingPids = await runningBrowserPids();
 
-      const discovery = await discoverArcExecutable({});
+      const discovery = await discoverExecutable(SPEC, {});
       const port = await ephemeralLoopbackPort();
       tempProfile = await mkdtemp(path.join(os.tmpdir(), "arc-mcp-test-"));
 
       // Never the persistent production profile, never the normal profile.
-      expect(path.resolve(tempProfile)).not.toBe(resolveMcpProfilePath(undefined));
+      expect(path.resolve(tempProfile)).not.toBe(resolveMcpProfilePath(undefined, SPEC.profileDirName));
 
       const engine = new CdpBrowserEngine(
         {
+          spec: SPEC,
           executablePath: discovery.executablePath,
           profilePath: tempProfile,
           debugPort: port,
@@ -184,9 +190,9 @@ describe("real dedicated Arc over CDP", () => {
         expect(pidAlive(ownedPid)).toBe(false);
       }
 
-      // Pre-existing unrelated Arc processes must remain alive.
+      // Pre-existing unrelated browser processes must remain alive.
       for (const pid of preexistingPids) {
-        expect(pidAlive(pid), `pre-existing Arc pid ${String(pid)} must survive`).toBe(true);
+        expect(pidAlive(pid), `pre-existing ${SPEC.displayName} pid ${String(pid)} must survive`).toBe(true);
       }
 
       // Remove the temporary test profile only after the owned exit.
@@ -194,8 +200,8 @@ describe("real dedicated Arc over CDP", () => {
       tempProfile = null;
 
       process.stderr.write(
-        `arc-integration evidence: strategy=${discovery.source} port=${String(port)} ` +
-          `browser=${version.browser} protocol=${version.protocol} ` +
+        `browser-integration evidence: browser=${SPEC.id} strategy=${discovery.source} port=${String(port)} ` +
+          `version=${version.browser} protocol=${version.protocol} ` +
           `contexts=${String(status.contextCount ?? 0)} ownedPid=${String(ownedPid)} ` +
           `preexisting=${preexistingPids.join(",")}\n`,
       );
