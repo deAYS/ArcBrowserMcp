@@ -87,7 +87,10 @@ class FakeInteractionRuntime extends BridgeRuntime {
       method === "interaction.click" ||
       method === "interaction.fill" ||
       method === "interaction.type" ||
-      method === "interaction.pressKey"
+      method === "interaction.pressKey" ||
+      method === "interaction.typeHuman" ||
+      method === "interaction.pressSequence" ||
+      method === "interaction.clickType"
     ) {
       return { accepted: true };
     }
@@ -175,10 +178,32 @@ describe("engine interaction selection gating", () => {
     expect(await catchCode(() => engine.type(REF, "x".repeat(INTERACTION_TEXT_LIMIT_BYTES + 1)))).toBe(
       "BROWSER_INVALID_TEXT",
     );
-    expect(await catchCode(() => engine.pressKey("F1"))).toBe("BROWSER_INVALID_KEY");
+    expect(await catchCode(() => engine.pressKey("Super+Enter"))).toBe("BROWSER_INVALID_KEY");
+    expect(await catchCode(() => engine.pressSequence([]))).toBe("BROWSER_INVALID_KEY");
+    expect(await catchCode(() => engine.pressSequence(["Enter"], { delayMs: 5000 }))).toBe("BROWSER_INVALID_KEY");
+    expect(await catchCode(() => engine.typeHuman(REF, "hi", { wpm: 5 }))).toBe("BROWSER_INVALID_TEXT");
     expect(runtime.requests.length).toBe(before);
     await engine.pressKey("Control+Enter");
     expect(runtime.requests.some((request) => request.method === "interaction.pressKey")).toBe(true);
+    await engine.pressKey("F1");
+    await engine.pressKey("Control+a");
+  });
+
+  it("sends humanized RPC with pacing params and maps remote codes", async () => {
+    const { engine, runtime } = harness();
+    await engine.connect();
+    await engine.selectTab(TAB_A);
+    runtime.requests.length = 0;
+    await engine.typeHuman(REF, "hello", { wpm: 90 });
+    await engine.pressSequence(["Control+a", "Backspace"], { delayMs: 25 });
+    await engine.clickType(REF, "search", { humanize: true, wpm: 100, submitKey: "Enter" });
+    const methods = runtime.requests.map((request) => request.method);
+    expect(methods).toEqual(["interaction.typeHuman", "interaction.pressSequence", "interaction.clickType"]);
+    expect(runtime.requests[0]?.payload).toMatchObject({ tabId: TAB_A, ref: REF, wpm: 90 });
+    expect(runtime.requests[1]?.payload).toMatchObject({ tabId: TAB_A, delayMs: 25 });
+    expect(runtime.requests[2]?.payload).toMatchObject({ tabId: TAB_A, ref: REF, submitKey: "Enter" });
+    runtime.failNext = new BridgeError("INVALID_ENVELOPE", "stale", { remoteCode: "STALE_ELEMENT" });
+    expect(await catchCode(() => engine.typeHuman(REF, "hi"))).toBe("BROWSER_STALE_ELEMENT");
   });
 
   it("returns getText text and validates the envelope; errors never echo secrets", async () => {
@@ -206,12 +231,18 @@ describe("BrowserService interaction delegation", () => {
     await expect(service.fill(REF, "hello")).resolves.toEqual({ accepted: true });
     await expect(service.type(REF, "x")).resolves.toEqual({ accepted: true });
     await expect(service.pressKey("Enter")).resolves.toEqual({ accepted: true });
+    await expect(service.typeHuman(REF, "hello")).resolves.toEqual({ accepted: true });
+    await expect(service.pressSequence(["Enter", "Tab"])).resolves.toEqual({ accepted: true });
+    await expect(service.clickType(REF, "hello")).resolves.toEqual({ accepted: true });
     await expect(service.getText(REF)).resolves.toEqual({ text: "Interaction Fixture" });
     expect(runtime.requests.map((request) => request.method)).toEqual([
       "interaction.click",
       "interaction.fill",
       "interaction.type",
       "interaction.pressKey",
+      "interaction.typeHuman",
+      "interaction.pressSequence",
+      "interaction.clickType",
       "interaction.getText",
     ]);
     const bare = new BrowserService();
@@ -219,6 +250,9 @@ describe("BrowserService interaction delegation", () => {
     await expect(bare.fill(REF, "x")).rejects.toMatchObject({ code: "BROWSER_OPERATION_NOT_IMPLEMENTED" });
     await expect(bare.type(REF, "x")).rejects.toMatchObject({ code: "BROWSER_OPERATION_NOT_IMPLEMENTED" });
     await expect(bare.pressKey("Enter")).rejects.toMatchObject({ code: "BROWSER_OPERATION_NOT_IMPLEMENTED" });
+    await expect(bare.typeHuman(REF, "x")).rejects.toMatchObject({ code: "BROWSER_OPERATION_NOT_IMPLEMENTED" });
+    await expect(bare.pressSequence(["Enter"])).rejects.toMatchObject({ code: "BROWSER_OPERATION_NOT_IMPLEMENTED" });
+    await expect(bare.clickType(REF, "x")).rejects.toMatchObject({ code: "BROWSER_OPERATION_NOT_IMPLEMENTED" });
     await expect(bare.getText(REF)).rejects.toMatchObject({ code: "BROWSER_OPERATION_NOT_IMPLEMENTED" });
   });
 });

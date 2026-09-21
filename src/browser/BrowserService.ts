@@ -2,6 +2,7 @@ import type { BrowserEngine } from "./BrowserEngine.js";
 import type {
   BrowserStatus,
   BrowserTab,
+  ClickTypeOptions,
   ConsoleClearResult,
   ConsoleResult,
   EvaluateOptions,
@@ -9,9 +10,11 @@ import type {
   NavigateResult,
   NetworkClearResult,
   NetworkResult,
+  PressSequenceOptions,
   ScreenshotResult,
   SnapshotOptions,
   SnapshotResult,
+  TypeHumanOptions,
   WaitCondition,
   WaitResult,
 } from "./models.js";
@@ -144,6 +147,27 @@ export class BrowserService {
   async pressKey(key: string): Promise<{ accepted: true }> {
     const engine = this.requireEngine("pressKey");
     await engine.pressKey(key);
+    return { accepted: true };
+  }
+
+  /** Humanized typing: chunked insert with WPM pacing (invalidates refs). */
+  async typeHuman(ref: string, text: string, options?: TypeHumanOptions): Promise<{ accepted: true }> {
+    const engine = this.requireEngine("typeHuman");
+    await engine.typeHuman(ref, text, options);
+    return { accepted: true };
+  }
+
+  /** Press a sequence of keys with inter-key delay (invalidates refs). */
+  async pressSequence(keys: string[], options?: PressSequenceOptions): Promise<{ accepted: true }> {
+    const engine = this.requireEngine("pressSequence");
+    await engine.pressSequence(keys, options);
+    return { accepted: true };
+  }
+
+  /** Click then type (optionally humanized + submit key) in one call. */
+  async clickType(ref: string, text: string, options?: ClickTypeOptions): Promise<{ accepted: true }> {
+    const engine = this.requireEngine("clickType");
+    await engine.clickType(ref, text, options);
     return { accepted: true };
   }
 

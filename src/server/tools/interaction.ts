@@ -86,11 +86,73 @@ export function registerInteractionTools(server: McpServer, services: Interactio
     {
       title: "Press key",
       description:
-        "Dispatch a supported key/chord (Enter, Tab, Escape, Backspace, Delete, arrows, Home, End, PageUp, PageDown, Space, optional Control/Shift/Alt/Meta) to the selected tab. Invalidates snapshot refs.",
+        "Dispatch a supported key/chord (Enter, Tab, Escape, Backspace, Delete, arrows, Home, End, PageUp, PageDown, Space, letters, digits, F1-F12, optional Control/Shift/Alt/Meta) to the selected tab. Invalidates snapshot refs.",
       inputSchema: z.object({ key: z.string() }),
       outputSchema: AcceptedSchema,
     },
     (args) => callTool(() => services.browser.pressKey(args.key)),
+  );
+
+  server.registerTool(
+    "browser_type_human",
+    {
+      title: "Humanized type",
+      description:
+        "Type text with human-like chunk pacing (one call fans out to many CDP inserts with WPM timing). Use for humanized form entry; invalidates snapshot refs.",
+      inputSchema: z.object({ ref: z.string(), text: z.string(), wpm: z.number().int().min(20).max(200).optional() }),
+      outputSchema: AcceptedSchema,
+    },
+    (args) =>
+      callTool(() =>
+        args.wpm === undefined
+          ? services.browser.typeHuman(args.ref, args.text)
+          : services.browser.typeHuman(args.ref, args.text, { wpm: args.wpm }),
+      ),
+  );
+
+  server.registerTool(
+    "browser_press_sequence",
+    {
+      title: "Press key sequence",
+      description:
+        "Press an ordered key sequence with inter-key delay in one call (e.g. shortcuts, multi-step dismissal). Invalidates snapshot refs.",
+      inputSchema: z.object({
+        keys: z.array(z.string()).min(1).max(50),
+        delayMs: z.number().int().min(0).max(2000).optional(),
+      }),
+      outputSchema: AcceptedSchema,
+    },
+    (args) =>
+      callTool(() =>
+        args.delayMs === undefined
+          ? services.browser.pressSequence(args.keys)
+          : services.browser.pressSequence(args.keys, { delayMs: args.delayMs }),
+      ),
+  );
+
+  server.registerTool(
+    "browser_click_type",
+    {
+      title: "Click then type",
+      description:
+        "Real mouse click then type (optionally humanized) plus an optional submit key — login/search in one call. Invalidates snapshot refs.",
+      inputSchema: z.object({
+        ref: z.string(),
+        text: z.string(),
+        humanize: z.boolean().optional(),
+        wpm: z.number().int().min(20).max(200).optional(),
+        submitKey: z.string().optional(),
+      }),
+      outputSchema: AcceptedSchema,
+    },
+    (args) =>
+      callTool(() =>
+        services.browser.clickType(args.ref, args.text, {
+          ...(args.humanize !== undefined ? { humanize: args.humanize } : {}),
+          ...(args.wpm !== undefined ? { wpm: args.wpm } : {}),
+          ...(args.submitKey !== undefined ? { submitKey: args.submitKey } : {}),
+        }),
+      ),
   );
 
   server.registerTool(

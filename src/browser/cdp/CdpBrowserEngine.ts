@@ -10,6 +10,7 @@ import type { BrowserEngine } from "../BrowserEngine.js";
 import type {
   BrowserStatus,
   BrowserTab,
+  ClickTypeOptions,
   ConsoleClearResult,
   ConsoleResult,
   ElementRef,
@@ -19,11 +20,13 @@ import type {
   NavigateResult,
   NetworkClearResult,
   NetworkResult,
+  PressSequenceOptions,
   ScreenshotOptions,
   ScreenshotResult,
   SnapshotOptions,
   SnapshotResult,
   TabId,
+  TypeHumanOptions,
   WaitCondition,
   WaitResult,
 } from "../models.js";
@@ -256,6 +259,21 @@ export class CdpBrowserEngine implements BrowserEngine {
 
   async pressKey(_key: string): Promise<void> {
     return this.notImplemented("pressKey");
+  }
+
+  async typeHuman(_ref: ElementRef, _text: string, _options?: TypeHumanOptions): Promise<void> {
+    void _options;
+    return this.notImplemented("typeHuman");
+  }
+
+  async pressSequence(_keys: string[], _options?: PressSequenceOptions): Promise<void> {
+    void _options;
+    return this.notImplemented("pressSequence");
+  }
+
+  async clickType(_ref: ElementRef, _text: string, _options?: ClickTypeOptions): Promise<void> {
+    void _options;
+    return this.notImplemented("clickType");
   }
 
   async getText(_ref?: ElementRef): Promise<string> {

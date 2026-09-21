@@ -32,7 +32,18 @@ import {
 } from "../../errors/BrowserError.js";
 import { BrowserError } from "../../errors/BrowserError.js";
 import { validateNavigationUrl } from "../navigationPolicy.js";
-import { INTERACTION_TEXT_LIMIT_BYTES, parsePressKey, utf8ByteLength } from "../interactionPolicy.js";
+import {
+  HUMANIZE_SEQUENCE_DELAY_MAX_MS,
+  HUMANIZE_SEQUENCE_DELAY_MIN_MS,
+  HUMANIZE_WPM_MAX,
+  HUMANIZE_WPM_MIN,
+  INTERACTION_TEXT_LIMIT_BYTES,
+  PRESS_SEQUENCE_MAX_KEYS,
+  normalizeSequenceDelayMs,
+  normalizeWpm,
+  parsePressKey,
+  utf8ByteLength,
+} from "../interactionPolicy.js";
 import {
   EVALUATE_DEFAULT_TIMEOUT_MS,
   EVALUATE_EXPRESSION_LIMIT_BYTES,
@@ -74,12 +85,15 @@ import type {
   NavigateResult,
   NetworkEntry,
   NetworkResult,
+  PressSequenceOptions,
   ScreenshotOptions,
   ScreenshotResult,
   SnapshotNode,
   SnapshotOptions,
   SnapshotResult,
+  ClickTypeOptions,
   TabId,
+  TypeHumanOptions,
   WaitCondition,
   WaitResult,
 } from "../models.js";
@@ -954,6 +968,103 @@ export class ExtensionEngine implements BrowserEngine {
       );
     } catch (error: unknown) {
       throw this.interactionFailure(selectedTabId, "press key", error);
+    }
+  }
+
+  async typeHuman(_ref: ElementRef, _text: string, _options?: TypeHumanOptions): Promise<void> {
+    const selectedTabId = this.selectedTabId;
+    if (selectedTabId === null) {
+      throw browserNoSelectedTab("human-type on");
+    }
+    this.requireTextSize(_text);
+    const wpm = normalizeWpm(_options?.wpm);
+    if (wpm === null) {
+      throw browserInvalidText(0, INTERACTION_TEXT_LIMIT_BYTES);
+    }
+    if (_options?.wpm !== undefined && (wpm < HUMANIZE_WPM_MIN || wpm > HUMANIZE_WPM_MAX)) {
+      throw browserInvalidText(0, INTERACTION_TEXT_LIMIT_BYTES);
+    }
+    await this.requireSelectedTab(selectedTabId, "human-type on");
+    try {
+      await this.runtime.request(
+        "interaction.typeHuman",
+        { tabId: selectedTabId, ref: _ref, text: _text, wpm },
+        Math.max(this.operationTimeoutMs(), 30_000),
+      );
+    } catch (error: unknown) {
+      throw this.interactionFailure(selectedTabId, "human type", error);
+    }
+  }
+
+  async pressSequence(_keys: string[], _options?: PressSequenceOptions): Promise<void> {
+    const selectedTabId = this.selectedTabId;
+    if (selectedTabId === null) {
+      throw browserNoSelectedTab("press a key sequence on");
+    }
+    if (!Array.isArray(_keys) || _keys.length === 0 || _keys.length > PRESS_SEQUENCE_MAX_KEYS) {
+      throw browserInvalidKey("(empty or oversized key sequence)");
+    }
+    for (const key of _keys) {
+      if (typeof key !== "string" || "error" in parsePressKey(key)) {
+        throw browserInvalidKey(typeof key === "string" ? key : "(non-string key)");
+      }
+    }
+    const delayMs = normalizeSequenceDelayMs(_options?.delayMs);
+    if (delayMs === null) {
+      throw browserInvalidKey("(invalid sequence delay)");
+    }
+    if (
+      _options?.delayMs !== undefined &&
+      (_options.delayMs < HUMANIZE_SEQUENCE_DELAY_MIN_MS || _options.delayMs > HUMANIZE_SEQUENCE_DELAY_MAX_MS)
+    ) {
+      throw browserInvalidKey("(invalid sequence delay)");
+    }
+    await this.requireSelectedTab(selectedTabId, "press a key sequence on");
+    try {
+      await this.runtime.request(
+        "interaction.pressSequence",
+        { tabId: selectedTabId, keys: [..._keys], delayMs },
+        Math.max(this.operationTimeoutMs(), 30_000),
+      );
+    } catch (error: unknown) {
+      throw this.interactionFailure(selectedTabId, "press sequence", error);
+    }
+  }
+
+  async clickType(_ref: ElementRef, _text: string, _options?: ClickTypeOptions): Promise<void> {
+    const selectedTabId = this.selectedTabId;
+    if (selectedTabId === null) {
+      throw browserNoSelectedTab("click-type on");
+    }
+    this.requireTextSize(_text);
+    const humanize = _options?.humanize ?? true;
+    if (typeof humanize !== "boolean") {
+      throw browserInvalidText(0, INTERACTION_TEXT_LIMIT_BYTES);
+    }
+    const wpm = normalizeWpm(_options?.wpm);
+    if (wpm === null) {
+      throw browserInvalidText(0, INTERACTION_TEXT_LIMIT_BYTES);
+    }
+    const submitKey = _options?.submitKey;
+    if (submitKey !== undefined && ("error" in parsePressKey(submitKey) || typeof submitKey !== "string")) {
+      throw browserInvalidKey(typeof submitKey === "string" ? submitKey : "(invalid submit key)");
+    }
+    await this.requireSelectedTab(selectedTabId, "click-type on");
+    try {
+      await this.runtime.request(
+        "interaction.clickType",
+        {
+          tabId: selectedTabId,
+          ref: _ref,
+          text: _text,
+          humanize,
+          wpm,
+          ...(submitKey !== undefined ? { submitKey } : {}),
+        },
+        Math.max(this.operationTimeoutMs(), 30_000),
+      );
+    } catch (error: unknown) {
+      throw this.interactionFailure(selectedTabId, "click-type", error);
     }
   }
 

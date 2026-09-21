@@ -86,7 +86,7 @@ describe("architecture boundaries", () => {
     }
   });
 
-    it("BrowserEngine exposes exactly the 24 required operations", () => {    const expected = [
+    it("BrowserEngine exposes exactly the 27 required operations", () => {    const expected = [
       "connect",
       "disconnect",
       "status",
@@ -103,6 +103,9 @@ describe("architecture boundaries", () => {
       "fill",
       "type",
       "pressKey",
+      "typeHuman",
+      "pressSequence",
+      "clickType",
       "getText",
       "evaluate",
       "screenshot",
@@ -120,7 +123,7 @@ describe("architecture boundaries", () => {
       methods.push(match[1] ?? "");
     }
     expect(methods).toEqual(expected);
-    expect(methods).toHaveLength(24);
+    expect(methods).toHaveLength(27);
   });
 });
 
@@ -279,7 +282,7 @@ describe("navigation boundaries", () => {
     const engine = stripComments(readSource("src/browser/extension/ExtensionEngine.ts"));
     // snapshot + interactions + page tools are all real; the
     // notImplemented helper is gone (CdpBrowserEngine keeps its own stubs).
-    for (const operation of ["click", "fill", "type", "pressKey", "getText", "screenshot", "evaluate", "waitFor"]) {
+    for (const operation of ["click", "fill", "type", "pressKey", "typeHuman", "pressSequence", "clickType", "getText", "screenshot", "evaluate", "waitFor"]) {
       expect(engine).not.toContain(`notImplemented("${operation}")`);
     }
     expect(engine).not.toContain("browserOperationNotImplemented");
@@ -301,9 +304,10 @@ describe("navigation boundaries", () => {
     // Runtime.evaluate is allowlisted ONLY for the explicit evaluate
     // path (evaluateElement -> runtime.evaluate bridge method). Prove this
     // structurally: interaction entry points (click/fill/type/pressKey/
-    // getText) and the snapshot capture / wait-corpus / screenshot helpers
-    // never reference it. The shared send() gate and evaluateElement own
-    // the only mentions; toProjectEvaluateValue only projects results.
+    // typeHuman/pressSequence/clickType/getText) and the snapshot capture
+    // / wait-corpus / screenshot helpers never reference it. The shared
+    // send() gate and evaluateElement own the only mentions;
+    // toProjectEvaluateValue only projects results.
     expect(ext).not.toContain("Runtime.callFunctionOn");
     expect(ext).not.toContain("DOM.click");
     for (const fn of [
@@ -311,6 +315,9 @@ describe("navigation boundaries", () => {
       "async fillElement(",
       "async typeIntoElement(",
       "async pressKeyOnTab(",
+      "async typeHumanElement(",
+      "async pressSequenceOnTab(",
+      "async clickTypeElement(",
       "async getElementText(",
       "async capture(",
       "async captureScreenshot(",
@@ -333,6 +340,9 @@ describe("navigation boundaries", () => {
       "interaction.fill",
       "interaction.type",
       "interaction.pressKey",
+      "interaction.typeHuman",
+      "interaction.pressSequence",
+      "interaction.clickType",
       "interaction.getText",
       "runtime.evaluate",
       "page.screenshot",
@@ -385,7 +395,7 @@ describe("navigation boundaries", () => {
     // Screenshot uses proper MCP image content, not textual base64 JSON.
     expect(pageTools).toContain('type: "image"');
     const interaction = stripComments(readSource("src/server/tools/interaction.ts"));
-    for (const tool of ["browser_click", "browser_fill", "browser_type", "browser_press_key", "browser_get_text"]) {
+    for (const tool of ["browser_click", "browser_fill", "browser_type", "browser_press_key", "browser_type_human", "browser_press_sequence", "browser_click_type", "browser_get_text"]) {
       expect(interaction).toContain(tool);
     }
     expect(interaction).not.toContain("browser_evaluate");

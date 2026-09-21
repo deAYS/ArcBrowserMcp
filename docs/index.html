@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ArcBrowserMcp — Arc MCP Bridge</title>
+<title>ArcBrowserMcp â€” Arc MCP Bridge</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 880px; margin: 0 auto; padding: 2rem 1rem 4rem; line-height: 1.55; }
@@ -23,7 +23,7 @@
 <body>
 <header>
   <h1>ArcBrowserMcp</h1>
-  <p>Local MCP server for driving Arc Browser on Windows — via the Arc MCP Bridge extension.</p>
+  <p>Local MCP server for driving Arc Browser on Windows â€” via the Arc MCP Bridge extension.</p>
 </header>
 
 <nav class="tabs" role="tablist" aria-label="Site sections">
@@ -37,9 +37,9 @@
 <main>
   <section id="tab-download" role="tabpanel" aria-labelledby="tabbtn-download">
     <h2>Download</h2>
-    <p class="meta">Requires Windows, Arc Browser, and Node.js ≥ 22. Expected extension ID after install:</p>
+    <p class="meta">Requires Windows, Arc Browser, and Node.js â‰¥ 22. Expected extension ID after install:</p>
     <p><code>hgipaclbbilhkpdbobokbgjfeafcbkpc</code></p>
-    <div class="card" id="release-loading"><p>Loading the latest release…</p></div>
+    <div class="card" id="release-loading"><p>Loading the latest releaseâ€¦</p></div>
     <div class="card" id="release-card" hidden>
       <h3 id="release-name"></h3>
       <p class="meta" id="release-meta"></p>
@@ -64,7 +64,7 @@ pnpm extension:pack   # drops release/*.zip + .sha256</code></pre>
     <h3>1. Requirements</h3>
     <ul>
       <li>Windows with Arc Browser installed</li>
-      <li>Node.js ≥ 22, pnpm 10, Git</li>
+      <li>Node.js â‰¥ 22, pnpm 10, Git</li>
     </ul>
     <h3>2. Build</h3>
     <pre><code>git clone https://github.com/deAYS/ArcBrowserMcp.git
@@ -86,7 +86,7 @@ pnpm bridge:ping</code></pre>
     <p><code>bridge:install</code> writes machine-specific Native Messaging files to
       <code>%LOCALAPPDATA%\arc-mcp\native-host\</code> and registers
       <code>HKCU\Software\Google\Chrome\NativeMessagingHosts\com.arc_mcp.bridge</code>.
-      Those files are local state — never commit them.</p>
+      Those files are local state â€” never commit them.</p>
     <h3>5. Run</h3>
     <pre><code>pnpm start   # serve MCP over stdio
 pnpm dev     # build once, then run with --watch</code></pre>
@@ -120,7 +120,7 @@ pnpm build:extension</code></pre>
       <li>Generated host files (<code>%LOCALAPPDATA%\arc-mcp\</code>), session files, or <code>release/</code> zips.</li>
       <li>Secrets, tokens, or the pipe session nonce in logs and tests.</li>
     </ul>
-      <p>License: MIT — see <a href="https://github.com/deAYS/ArcBrowserMcp/blob/main/LICENSE">LICENSE</a>.
+      <p>License: MIT â€” see <a href="https://github.com/deAYS/ArcBrowserMcp/blob/main/LICENSE">LICENSE</a>.
       Report issues at <a href="https://github.com/deAYS/ArcBrowserMcp/issues">GitHub Issues</a>.</p>
   </section>
 
@@ -144,7 +144,7 @@ pnpm build:extension</code></pre>
 }</code></pre>
 
     <h3>2. Tool permissions</h3>
-    <p>Tools are named <code>arc-mcp_&lt;tool&gt;</code>, e.g. <code>arc-mcp_browser_open_tab</code>. One wildcard covers all 20 <code>browser_*</code> tools:</p>
+    <p>Tools are named <code>arc-mcp_&lt;tool&gt;</code>, e.g. <code>arc-mcp_browser_open_tab</code>. One wildcard covers all 23 <code>browser_*</code> tools:</p>
     <pre><code>{
   "$schema": "https://opencode.ai/config.json",
   "permission": {
@@ -159,7 +159,7 @@ pnpm build:extension</code></pre>
     "arc-mcp_browser_click": "ask",
     "arc-mcp_browser_fill": "ask",
     "arc-mcp_browser_type": "ask",
-    "arc-mcp_browser_press_key": "ask",
+    "arc-mcp_browser_press_key": "ask",\n    "arc-mcp_browser_type_human": "ask",\n    "arc-mcp_browser_press_sequence": "ask",\n    "arc-mcp_browser_click_type": "ask",
     "arc-mcp_browser_navigate": "ask"
   }
 }</code></pre>
@@ -169,12 +169,12 @@ pnpm build:extension</code></pre>
     "arc-mcp_*": "deny"
   }
 }</code></pre>
-    <p class="meta">Read-only: status, list_tabs, snapshot, get_text, screenshot, wait_for, console, network. State-changing: open/close/select tab, navigate, back, forward, reload, click, fill, type, press_key, evaluate.</p>
+    <p class="meta">Read-only: status, list_tabs, snapshot, get_text, screenshot, wait_for, console, network. State-changing: open/close/select tab, navigate, back, forward, reload, click, fill, type, type_human, press_key, press_sequence, click_type, evaluate.</p>
 
     <h3>3. Start and verify</h3>
     <ol>
       <li>Restart OpenCode after changing config (MCP servers are loaded at startup).</li>
-      <li>Run <code>/mcp</code> — <code>arc-mcp</code> should list as connected with the 20 <code>arc-mcp_browser_*</code> tools.</li>
+      <li>Run <code>/mcp</code> â€” <code>arc-mcp</code> should list as connected with the 23 <code>arc-mcp_browser_*</code> tools.</li>
       <li>The sidecar <code>node dist/index.js</code> starts on first use; with the extension bridge up, <code>browser_status</code> reports <code>connected: true</code>.</li>
     </ol>
 
@@ -182,15 +182,15 @@ pnpm build:extension</code></pre>
     <p>Example first prompt:</p>
     <pre><code>Check the browser status, open https://www.google.com in a new tab,
 take a snapshot, and screenshot the page.</code></pre>
-    <p>Under the hood that maps to <code>browser_status</code> → <code>browser_open_tab</code> → <code>browser_snapshot</code> → <code>browser_screenshot</code>. Interactions come next: snapshot, then click/fill the returned element refs.</p>
-    <p class="meta">Multiple OpenCode sessions can share the same Arc at once — requests queue through one shared bridge connection; leaving a session leaves nothing to clean up.</p>
+    <p>Under the hood that maps to <code>browser_status</code> â†’ <code>browser_open_tab</code> â†’ <code>browser_snapshot</code> â†’ <code>browser_screenshot</code>. Interactions come next: snapshot, then click/fill the returned element refs.</p>
+    <p class="meta">Multiple OpenCode sessions can share the same Arc at once â€” requests queue through one shared bridge connection; leaving a session leaves nothing to clean up.</p>
   </section>
 
   <section id="tab-claude" role="tabpanel" aria-labelledby="tabbtn-claude" hidden>
     <h2>Using ArcBrowserMcp with Claude</h2>
     <p class="meta">Prerequisite: the Install Guide steps are done once (extension loaded in Arc, native host registered, <code>pnpm build</code> current).</p>
 
-    <h3>1. Claude Code — register the server</h3>
+    <h3>1. Claude Code â€” register the server</h3>
     <p>One command from any project (recommended):</p>
     <pre><code>claude mcp add arc-mcp -- node "&lt;absolute-path-to-repo&gt;\dist\index.js"</code></pre>
     <p>Or commit it for the team via <code>.mcp.json</code> at the project root (this repo ships one):</p>
@@ -203,7 +203,7 @@ take a snapshot, and screenshot the page.</code></pre>
   }
 }</code></pre>
 
-    <h3>2. Claude Code — permissions</h3>
+    <h3>2. Claude Code â€” permissions</h3>
     <p>Put this in <code>.claude/settings.json</code> (or <code>.claude/settings.local.json</code> for just you):</p>
     <pre><code>{
   "permissions": {
@@ -229,7 +229,7 @@ take a snapshot, and screenshot the page.</code></pre>
     <h3>4. Start and verify</h3>
     <ol>
       <li>Restart Claude Code / the Desktop app after changing config.</li>
-      <li>In Claude Code, run <code>/mcp</code> — <code>arc-mcp</code> should show connected with 20 tools named <code>mcp__arc-mcp__browser_*</code>.</li>
+      <li>In Claude Code, run <code>/mcp</code> â€” <code>arc-mcp</code> should show connected with 20 tools named <code>mcp__arc-mcp__browser_*</code>.</li>
       <li>First useful check: ask for <code>browser_status</code>; with Arc and the bridge running it reports <code>connected: true</code>.</li>
     </ol>
 
@@ -237,12 +237,12 @@ take a snapshot, and screenshot the page.</code></pre>
     <p>Example first prompt:</p>
     <pre><code>Check the browser status, open https://www.google.com in a new tab,
 take a snapshot, and click the search box.</code></pre>
-    <p>That maps to <code>browser_status</code> → <code>browser_open_tab</code> → <code>browser_snapshot</code> → <code>browser_click</code> on a returned ref.</p>
+    <p>That maps to <code>browser_status</code> â†’ <code>browser_open_tab</code> â†’ <code>browser_snapshot</code> â†’ <code>browser_click</code> on a returned ref.</p>
   </section>
 </main>
 
 <footer>
-  <p class="meta">ArcBrowserMcp — MIT. Sources at <a href="https://github.com/deAYS/ArcBrowserMcp">deAYS/ArcBrowserMcp</a>.</p>
+  <p class="meta">ArcBrowserMcp â€” MIT. Sources at <a href="https://github.com/deAYS/ArcBrowserMcp">deAYS/ArcBrowserMcp</a>.</p>
 </footer>
 
 <script>
@@ -283,7 +283,7 @@ async function loadLatestRelease() {
   const shaSidecar = (release.assets || []).find((a) => a.name.endsWith(".sha256"));
   document.getElementById("release-name").textContent = release.name || release.tag_name;
   document.getElementById("release-meta").textContent =
-    `${release.tag_name} · published ${new Date(release.published_at).toLocaleDateString()}`;
+    `${release.tag_name} Â· published ${new Date(release.published_at).toLocaleDateString()}`;
   const notes = document.getElementById("release-notes-link");
   const notesLink = document.createElement("a");
   notesLink.href = release.html_url;
@@ -318,3 +318,4 @@ loadLatestRelease();
 </script>
 </body>
 </html>
+

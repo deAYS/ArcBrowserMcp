@@ -426,12 +426,111 @@ describe("pressKey", () => {
     const fixture = harness();
     await refs(fixture);
     const before = fixture.commands.length;
-    await expect(fixture.manager.pressKeyOnTab(PROJECT, "F1")).rejects.toMatchObject({ code: "INVALID_KEY" });
-    await expect(fixture.manager.pressKeyOnTab(PROJECT, "a")).rejects.toMatchObject({ code: "INVALID_KEY" });
+    await expect(fixture.manager.pressKeyOnTab(PROJECT, "Super+Enter")).rejects.toMatchObject({ code: "INVALID_KEY" });
+    await expect(fixture.manager.pressKeyOnTab(PROJECT, "Shift")).rejects.toMatchObject({ code: "INVALID_KEY" });
     expect(fixture.commands.length).toBe(before);
     await fixture.manager.pressKeyOnTab(PROJECT, "Control+Enter");
     const last = fixture.commands.filter((command) => command.method === "Input.dispatchKeyEvent").at(-2);
     expect(last?.params?.["modifiers"]).toBe(2);
+    await fixture.manager.pressKeyOnTab(PROJECT, "F1");
+    await fixture.manager.pressKeyOnTab(PROJECT, "Control+a");
+  });
+});
+
+describe("typeHuman", () => {
+  it("chunks inserts with pacing and invalidates refs", async () => {
+    const fixture = harness();
+    const live = await refs(fixture);
+    const textbox = live["Name"];
+    if (textbox === undefined) {
+      throw new Error("expected a textbox ref");
+    }
+    await fixture.manager.typeHumanElement(PROJECT, textbox, "hello world", 200);
+    const inserts = fixture.commands.filter((command) => command.method === "Input.insertText");
+    expect(inserts.length).toBeGreaterThan(1);
+    expect(inserts.map((entry) => String(entry.params?.["text"])).join("")).toBe("hello world");
+    expect(fixture.manager.isRefValid(PROJECT, textbox)).toBe(false);
+  });
+
+  it("rejects bad wpm, non-editable, and oversized text", async () => {
+    const fixture = harness();
+    const live = await refs(fixture);
+    const textbox = live["Name"];
+    if (textbox === undefined) {
+      throw new Error("expected a textbox ref");
+    }
+    await expect(fixture.manager.typeHumanElement(PROJECT, textbox, "hi", 5)).rejects.toMatchObject({
+      code: "INVALID_TEXT",
+    });
+    await expect(
+      fixture.manager.typeHumanElement(PROJECT, textbox, "x".repeat(INTERACTION_TEXT_LIMIT_BYTES + 1)),
+    ).rejects.toMatchObject({ code: "INVALID_TEXT" });
+    const buttons = harness({ describeImpl: () => ({ node: { nodeName: "BUTTON", attributes: [] } }) });
+    const buttonRefs = await refs(buttons);
+    const button = buttonRefs["Submit"];
+    if (button === undefined) {
+      throw new Error("expected a button ref");
+    }
+    await expect(buttons.manager.typeHumanElement(PROJECT, button, "hi")).rejects.toMatchObject({
+      code: "ELEMENT_NOT_EDITABLE",
+    });
+  });
+});
+
+describe("pressSequence", () => {
+  it("dispatches ordered keys and invalidates refs", async () => {
+    const fixture = harness();
+    await refs(fixture);
+    await fixture.manager.pressSequenceOnTab(PROJECT, ["Control+a", "Backspace", "Enter"], 0);
+    const keys = fixture.commands.filter((command) => command.method === "Input.dispatchKeyEvent");
+    // Control+a (2 events) + Backspace (2) + Enter (2).
+    expect(keys.length).toBe(6);
+  });
+
+  it("rejects empty/oversized/invalid sequences before CDP", async () => {
+    const fixture = harness();
+    await refs(fixture);
+    const before = fixture.commands.length;
+    await expect(fixture.manager.pressSequenceOnTab(PROJECT, [])).rejects.toMatchObject({ code: "INVALID_KEY" });
+    await expect(
+      fixture.manager.pressSequenceOnTab(PROJECT, Array.from({ length: 51 }, () => "Enter")),
+    ).rejects.toMatchObject({ code: "INVALID_KEY" });
+    await expect(fixture.manager.pressSequenceOnTab(PROJECT, ["Super+Enter"])).rejects.toMatchObject({
+      code: "INVALID_KEY",
+    });
+    await expect(fixture.manager.pressSequenceOnTab(PROJECT, ["Enter"], 5000)).rejects.toMatchObject({
+      code: "INVALID_KEY",
+    });
+    expect(fixture.commands.length).toBe(before);
+  });
+});
+
+describe("clickType", () => {
+  it("clicks then types and submits in one call", async () => {
+    const fixture = harness();
+    const live = await refs(fixture);
+    const textbox = live["Name"];
+    if (textbox === undefined) {
+      throw new Error("expected a textbox ref");
+    }
+    await fixture.manager.clickTypeElement(PROJECT, textbox, "hi", { humanize: false, submitKey: "Enter" });
+    const methods = fixture.commands.map((command) => command.method);
+    expect(methods).toContain("Input.dispatchMouseEvent");
+    expect(methods).toContain("Input.insertText");
+    expect(methods).toContain("Input.dispatchKeyEvent");
+    expect(fixture.manager.isRefValid(PROJECT, textbox)).toBe(false);
+  });
+
+  it("rejects bad submit keys without leaking text", async () => {
+    const fixture = harness();
+    const live = await refs(fixture);
+    const textbox = live["Name"];
+    if (textbox === undefined) {
+      throw new Error("expected a textbox ref");
+    }
+    await expect(
+      fixture.manager.clickTypeElement(PROJECT, textbox, "hi", { submitKey: "Super+Enter" }),
+    ).rejects.toMatchObject({ code: "INVALID_KEY" });
   });
 });
 

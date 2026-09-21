@@ -270,7 +270,7 @@ export function browserElementNotEditable(reason: string): BrowserError {
 export function browserInvalidKey(key: string): BrowserError {
   return new BrowserError(
     "BROWSER_INVALID_KEY",
-    `Unsupported key ${JSON.stringify(key)}; use Enter, Tab, Escape, Backspace, Delete, arrows, Home, End, PageUp, PageDown, Space, optionally with Control/Shift/Alt/Meta.`,
+    `Unsupported key ${JSON.stringify(key)}; use Enter, Tab, Escape, Backspace, Delete, arrows, Home, End, PageUp, PageDown, Space, letters, digits, F1-F12, optionally with Control/Shift/Alt/Meta.`,
     {},
   );
 }

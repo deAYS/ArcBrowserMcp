@@ -6,6 +6,7 @@ Local MCP server for driving Arc Browser on Windows. Clients talk to it over std
 - HTTP/HTTPS navigation plus back, forward, reload
 - Accessibility snapshots with opaque element refs
 - Real click, fill, type, and key interaction
+- Humanized composites: paced typing, key sequences, click-type in one call
 - Element text reads
 - JavaScript evaluation with by-value results
 - Viewport PNG screenshots
@@ -110,7 +111,10 @@ Point any stdio-capable MCP client at this command, for example with command `no
 | `browser_click` | Dispatch a real left mouse click to a live snapshot element ref on the selected tab. Invalidates snapshot refs. |
 | `browser_fill` | Replace an editable control's text with the supplied text (real keyboard/input mechanics, no script). Invalidates snapshot refs. |
 | `browser_type` | Insert text at the caret without clearing the field (real input mechanics, no script). Invalidates snapshot refs. |
-| `browser_press_key` | Dispatch a supported key/chord (Enter, Tab, Escape, Backspace, Delete, arrows, Home, End, PageUp, PageDown, Space, optional Control/Shift/Alt/Meta) to the selected tab. Invalidates snapshot refs. |
+| `browser_press_key` | Dispatch a supported key/chord (Enter, Tab, Escape, Backspace, Delete, arrows, Home, End, PageUp, PageDown, Space, letters, digits, F1-F12, optional Control/Shift/Alt/Meta) to the selected tab. Invalidates snapshot refs. |
+| `browser_type_human` | Type with human-like chunk pacing at a WPM rate (one call fans out to many inserts). Invalidates snapshot refs. |
+| `browser_press_sequence` | Press an ordered key sequence with inter-key delay in one call. Invalidates snapshot refs. |
+| `browser_click_type` | Real click then type (optionally humanized) plus optional submit key in one call. Invalidates snapshot refs. |
 | `browser_get_text` | Fresh semantic Accessibility read of a live snapshot element ref. Read-only; password/protected values stay redacted. |
 | `browser_evaluate` | Evaluate JavaScript in the selected controllable page and return a by-value result. Arbitrary page JS may run; refs are invalidated after dispatch. |
 | `browser_screenshot` | Capture the current viewport of the selected tab as PNG. Read-only; does not invalidate refs. |
@@ -122,7 +126,7 @@ Point any stdio-capable MCP client at this command, for example with command `no
 
 - Everything tab-scoped acts on the logically selected BrowserMcp tab. There is no active-tab fallback; without a selection these tools fail with `BROWSER_NO_SELECTED_TAB`.
 - Element refs are opaque strings, not DOM or CDP ids, and are only valid for the latest snapshot of that tab.
-- Navigation, click, fill, type, key press, and dispatched evaluation invalidate prior refs. `browser_get_text`, `browser_screenshot`, waits, and observability get/clear preserve them.
+- Navigation, click, fill, type, key press, humanized type, key sequence, click-type, and dispatched evaluation invalidate prior refs. `browser_get_text`, `browser_screenshot`, waits, and observability get/clear preserve them.
 - Privileged pages (`chrome://`, `arc://`, `devtools:`, `view-source:`, other non-HTTP(S) pages) are rejected with `BROWSER_TAB_NOT_CONTROLLABLE`.
 - Navigation accepts HTTP/HTTPS destinations only. Other schemes, embedded credentials, and control characters fail with `BROWSER_URL_NOT_ALLOWED`.
 

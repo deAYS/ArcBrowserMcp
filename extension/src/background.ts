@@ -541,6 +541,87 @@ bridge.onRemoteRequest(async (method, payload, _id) => {
       throw toBridgeSnapshotError(error);
     }
   }
+  if (method === "interaction.typeHuman") {
+    const tabId = stringParam(payload, "tabId");
+    const ref = stringParam(payload, "ref");
+    if (tabId === undefined) {
+      throw new SnapshotErrorShim("TAB_INVALID_ID", "interaction.typeHuman requires tabId");
+    }
+    if (ref === undefined) {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.typeHuman requires ref");
+    }
+    const text = payload["text"];
+    if (typeof text !== "string") {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.typeHuman requires text");
+    }
+    const wpm = payload["wpm"];
+    if (wpm !== undefined && (typeof wpm !== "number" || !Number.isInteger(wpm))) {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.typeHuman field wpm must be an integer");
+    }
+    try {
+      return await snapshotManager.typeHumanElement(tabId, ref, text, typeof wpm === "number" ? wpm : undefined);
+    } catch (error: unknown) {
+      throw toBridgeSnapshotError(error);
+    }
+  }
+  if (method === "interaction.pressSequence") {
+    const tabId = stringParam(payload, "tabId");
+    if (tabId === undefined) {
+      throw new SnapshotErrorShim("TAB_INVALID_ID", "interaction.pressSequence requires tabId");
+    }
+    const keys = payload["keys"];
+    if (!Array.isArray(keys)) {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.pressSequence requires keys");
+    }
+    const delayMs = payload["delayMs"];
+    if (delayMs !== undefined && (typeof delayMs !== "number" || !Number.isInteger(delayMs))) {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.pressSequence field delayMs must be an integer");
+    }
+    try {
+      return await snapshotManager.pressSequenceOnTab(
+        tabId,
+        keys,
+        typeof delayMs === "number" ? delayMs : undefined,
+      );
+    } catch (error: unknown) {
+      throw toBridgeSnapshotError(error);
+    }
+  }
+  if (method === "interaction.clickType") {
+    const tabId = stringParam(payload, "tabId");
+    const ref = stringParam(payload, "ref");
+    if (tabId === undefined) {
+      throw new SnapshotErrorShim("TAB_INVALID_ID", "interaction.clickType requires tabId");
+    }
+    if (ref === undefined) {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType requires ref");
+    }
+    const text = payload["text"];
+    if (typeof text !== "string") {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType requires text");
+    }
+    const humanize = payload["humanize"];
+    if (humanize !== undefined && typeof humanize !== "boolean") {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType field humanize must be a boolean");
+    }
+    const wpm = payload["wpm"];
+    if (wpm !== undefined && (typeof wpm !== "number" || !Number.isInteger(wpm))) {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType field wpm must be an integer");
+    }
+    const submitKey = payload["submitKey"];
+    if (submitKey !== undefined && typeof submitKey !== "string") {
+      throw new SnapshotErrorShim("SNAPSHOT_FAILED", "interaction.clickType field submitKey must be a string");
+    }
+    try {
+      return await snapshotManager.clickTypeElement(tabId, ref, text, {
+        ...(humanize !== undefined ? { humanize: humanize as boolean } : {}),
+        ...(typeof wpm === "number" ? { wpm } : {}),
+        ...(typeof submitKey === "string" ? { submitKey } : {}),
+      });
+    } catch (error: unknown) {
+      throw toBridgeSnapshotError(error);
+    }
+  }
   if (method === "interaction.getText") {
     const tabId = stringParam(payload, "tabId");
     const ref = stringParam(payload, "ref");

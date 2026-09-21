@@ -1,6 +1,7 @@
 import type {
   BrowserStatus,
   BrowserTab,
+  ClickTypeOptions,
   ConsoleClearResult,
   ConsoleResult,
   ElementRef,
@@ -10,11 +11,13 @@ import type {
   NavigateResult,
   NetworkClearResult,
   NetworkResult,
+  PressSequenceOptions,
   ScreenshotOptions,
   ScreenshotResult,
   SnapshotOptions,
   SnapshotResult,
   TabId,
+  TypeHumanOptions,
   WaitCondition,
   WaitResult,
 } from "./models.js";
@@ -43,6 +46,9 @@ export interface BrowserEngine {
   fill(ref: ElementRef, text: string): Promise<void>;
   type(ref: ElementRef, text: string): Promise<void>;
   pressKey(key: string): Promise<void>;
+  typeHuman(ref: ElementRef, text: string, options?: TypeHumanOptions): Promise<void>;
+  pressSequence(keys: string[], options?: PressSequenceOptions): Promise<void>;
+  clickType(ref: ElementRef, text: string, options?: ClickTypeOptions): Promise<void>;
   getText(ref?: ElementRef): Promise<string>;
   evaluate(expression: string, options?: EvaluateOptions): Promise<EvaluateResult>;
   screenshot(options?: ScreenshotOptions): Promise<ScreenshotResult>;

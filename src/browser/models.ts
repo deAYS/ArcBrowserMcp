@@ -105,6 +105,25 @@ export interface InteractionResult {
   readonly accepted: true;
 }
 
+export interface TypeHumanOptions {
+  /** Words per minute 20-200; default 80. Controls chunk pacing. */
+  readonly wpm?: number;
+}
+
+export interface PressSequenceOptions {
+  /** Inter-key pause in ms 0-2000; default 60. */
+  readonly delayMs?: number;
+}
+
+export interface ClickTypeOptions {
+  /** Raw text is replaced by humanized chunk pacing when true (default). */
+  readonly humanize?: boolean;
+  /** WPM used when humanize is true; default 80. */
+  readonly wpm?: number;
+  /** Optional single submit key pressed after typing (e.g. "Enter"). */
+  readonly submitKey?: string;
+}
+
 export interface ElementTextResult {
   readonly text: string;
   readonly role: string;

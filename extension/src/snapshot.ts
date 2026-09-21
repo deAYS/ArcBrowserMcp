@@ -51,7 +51,17 @@ import {
   type SnapshotNode,
 } from "../../src/browser/snapshotSemantics.js";
 import {
+  HUMANIZE_SEQUENCE_DELAY_MAX_MS,
+  HUMANIZE_SEQUENCE_DELAY_MIN_MS,
+  HUMANIZE_WPM_DEFAULT,
+  HUMANIZE_WPM_MAX,
+  HUMANIZE_WPM_MIN,
   INTERACTION_TEXT_LIMIT_BYTES,
+  PRESS_SEQUENCE_MAX_KEYS,
+  chunkTextForHumanize,
+  humanizeChunkDelayMs,
+  normalizeSequenceDelayMs,
+  normalizeWpm,
   parsePressKey,
   utf8ByteLength,
 } from "../../src/browser/interactionPolicy.js";
@@ -223,6 +233,17 @@ export interface SnapshotManagerOptions {
 /** Deterministic controllability gate: only http:/https: are snapshotable. */
 export function isSnapshotableSourceUrl(url: string): boolean {
   return /^https?:/i.test(url);
+}
+
+/** Bounded pacing sleep for humanized composites (MV3-safe setTimeout). */
+function humanizeSleep(ms: number): Promise<void> {
+  const clamped = Number.isInteger(ms) && ms > 0 ? Math.min(ms, 2000) : 0;
+  if (clamped === 0) {
+    return Promise.resolve();
+  }
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, clamped);
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1158,6 +1179,234 @@ export class DebuggerSessionManager {
     }
     this.invalidateTabByProject(projectTabId);
     return { pressed: true };
+  }
+
+  private async dispatchParsedKey(chromeId: number, projectTabId: string, rawKey: string): Promise<void> {
+    const parsed = parsePressKey(rawKey);
+    if ("error" in parsed) {
+      throw new SnapshotError("INVALID_KEY", "unsupported key in sequence");
+    }
+    const base = {
+      key: parsed.key,
+      code: parsed.code,
+      windowsVirtualKeyCode: parsed.windowsVirtualKeyCode,
+      nativeVirtualKeyCode: parsed.windowsVirtualKeyCode,
+      modifiers: parsed.modifiers,
+    };
+    try {
+      if (parsed.key.length === 1 && !parsed.control && !parsed.meta && !parsed.alt) {
+        await this.interactionSend(chromeId, "Input.dispatchKeyEvent", { ...base, type: "char", text: parsed.key });
+      } else {
+        await this.interactionSend(chromeId, "Input.dispatchKeyEvent", { ...base, type: "keyDown" });
+        await this.interactionSend(chromeId, "Input.dispatchKeyEvent", { ...base, type: "keyUp" });
+      }
+    } catch (error: unknown) {
+      throw this.staleFromCommand(chromeId, projectTabId, error);
+    }
+  }
+
+  private async requireEditable(chromeId: number, backendNodeId: number, projectTabId: string): Promise<void> {
+    let info: { nodeName: string; type: string | null };
+    try {
+      info = await this.classifyControl(chromeId, backendNodeId);
+    } catch (error: unknown) {
+      throw this.staleFromCommand(chromeId, projectTabId, error);
+    }
+    if (DebuggerSessionManager.isFileControl(info)) {
+      throw new SnapshotError("ELEMENT_NOT_EDITABLE", "file inputs cannot receive humanized input");
+    }
+    if (!DebuggerSessionManager.isEditableControl(info)) {
+      throw new SnapshotError("ELEMENT_NOT_EDITABLE", "the target is not an editable text control");
+    }
+  }
+
+  /**
+   * Humanized typing: focus once, then insert text in small chunks with
+   * WPM-derived pacing (one bridge call -> many CDP inserts). Reuses only
+   * the existing interaction allowlist (DOM.focus, Input.insertText).
+   */
+  async typeHumanElement(projectTabId: string, ref: string, text: string, wpm?: number): Promise<{ typed: true }> {
+    const effectiveWpm = normalizeWpm(wpm);
+    if (effectiveWpm === null) {
+      throw new SnapshotError("INVALID_TEXT", "wpm is outside the 20-200 range");
+    }
+    void HUMANIZE_WPM_MIN;
+    void HUMANIZE_WPM_MAX;
+    const { chromeId, backendNodeId } = await this.beginInteraction(projectTabId, ref, text);
+    try {
+      await this.requireEditable(chromeId, backendNodeId, projectTabId);
+      try {
+        await this.interactionSend(chromeId, "DOM.focus", { backendNodeId });
+        const chunks = chunkTextForHumanize(text);
+        for (let index = 0; index < chunks.length; index += 1) {
+          const chunk = chunks[index] ?? "";
+          if (chunk.length === 0) {
+            continue;
+          }
+          await this.interactionSend(chromeId, "Input.insertText", { text: chunk });
+          if (index + 1 < chunks.length) {
+            await humanizeSleep(humanizeChunkDelayMs(effectiveWpm, index, chunk));
+          }
+        }
+      } catch (error: unknown) {
+        if (error instanceof SnapshotError) {
+          throw error;
+        }
+        throw this.staleFromCommand(chromeId, projectTabId, error);
+      }
+    } catch (error: unknown) {
+      if (error instanceof SnapshotError) {
+        throw error;
+      }
+      throw this.staleFromCommand(chromeId, projectTabId, error);
+    }
+    this.invalidateTabByProject(projectTabId);
+    return { typed: true };
+  }
+
+  /**
+   * Press a bounded sequence of keys with inter-key pacing (one bridge
+   * call -> many dispatchKeyEvent pairs). Tab-scoped, no ref needed.
+   */
+  async pressSequenceOnTab(projectTabId: string, keys: string[], delayMs?: number): Promise<{ pressed: true }> {
+    if (!Array.isArray(keys) || keys.length === 0 || keys.length > PRESS_SEQUENCE_MAX_KEYS) {
+      throw new SnapshotError("INVALID_KEY", "key sequence must contain 1-50 keys");
+    }
+    const effectiveDelay = normalizeSequenceDelayMs(delayMs);
+    if (effectiveDelay === null) {
+      throw new SnapshotError("INVALID_KEY", "sequence delay is outside the 0-2000ms range");
+    }
+    void HUMANIZE_SEQUENCE_DELAY_MIN_MS;
+    void HUMANIZE_SEQUENCE_DELAY_MAX_MS;
+    let chromeId: number;
+    try {
+      chromeId = await this.resolveTab(projectTabId);
+    } catch (error: unknown) {
+      throw this.preserveTabError(error, projectTabId);
+    }
+    for (const key of keys) {
+      if (typeof key !== "string" || "error" in parsePressKey(key)) {
+        throw new SnapshotError("INVALID_KEY", "unsupported key in sequence");
+      }
+    }
+    const record = this.getRecord(chromeId);
+    const url = record?.url ?? "";
+    if (!isSnapshotableSourceUrl(url)) {
+      throw new SnapshotError(
+        "TAB_NOT_CONTROLLABLE",
+        `tab ${JSON.stringify(projectTabId)} is not a controllable web page`,
+      );
+    }
+    await this.ensureAttached(chromeId, projectTabId);
+    for (let index = 0; index < keys.length; index += 1) {
+      await this.dispatchParsedKey(chromeId, projectTabId, keys[index] as string);
+      if (index + 1 < keys.length && effectiveDelay > 0) {
+        await humanizeSleep(effectiveDelay);
+      }
+    }
+    this.invalidateTabByProject(projectTabId);
+    return { pressed: true };
+  }
+
+  /**
+   * Click-then-type composite: real mouse click, focus, then instant or
+   * humanized insert plus an optional submit key — the login/search flow
+   * in one bridge call. Reuses clickPoint + focus + insertText only.
+   */
+  async clickTypeElement(
+    projectTabId: string,
+    ref: string,
+    text: string,
+    options?: { humanize?: boolean; wpm?: number; submitKey?: string },
+  ): Promise<{ typed: true }> {
+    const humanize = options?.humanize ?? true;
+    const effectiveWpm = normalizeWpm(options?.wpm);
+    if (effectiveWpm === null) {
+      throw new SnapshotError("INVALID_TEXT", "wpm is outside the 20-200 range");
+    }
+    if (options?.submitKey !== undefined && ("error" in parsePressKey(options.submitKey) || typeof options.submitKey !== "string")) {
+      throw new SnapshotError("INVALID_KEY", "unsupported submit key");
+    }
+    void HUMANIZE_WPM_DEFAULT;
+    const { chromeId, backendNodeId } = await this.beginInteraction(projectTabId, ref, text);
+    try {
+      let info: { nodeName: string; type: string | null };
+      try {
+        info = await this.classifyControl(chromeId, backendNodeId);
+      } catch (error: unknown) {
+        throw this.staleFromCommand(chromeId, projectTabId, error);
+      }
+      if (DebuggerSessionManager.isFileControl(info)) {
+        throw new SnapshotError("ELEMENT_NOT_EDITABLE", "file inputs cannot be click-typed");
+      }
+      const point = await this.clickPoint(chromeId, backendNodeId);
+      try {
+        await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+          type: "mouseMoved",
+          x: point.x,
+          y: point.y,
+          button: "none",
+          clickCount: 0,
+        });
+        await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+          type: "mousePressed",
+          x: point.x,
+          y: point.y,
+          button: "left",
+          clickCount: 1,
+        });
+        await this.interactionSend(chromeId, "Input.dispatchMouseEvent", {
+          type: "mouseReleased",
+          x: point.x,
+          y: point.y,
+          button: "left",
+          clickCount: 1,
+        });
+      } catch (error: unknown) {
+        throw this.staleFromCommand(chromeId, projectTabId, error);
+      }
+      try {
+        await this.requireEditable(chromeId, backendNodeId, projectTabId);
+      } catch (error: unknown) {
+        if (error instanceof SnapshotError) {
+          throw error;
+        }
+        throw this.staleFromCommand(chromeId, projectTabId, error);
+      }
+      try {
+        await this.interactionSend(chromeId, "DOM.focus", { backendNodeId });
+        if (!humanize) {
+          await this.interactionSend(chromeId, "Input.insertText", { text });
+        } else {
+          const chunks = chunkTextForHumanize(text);
+          for (let index = 0; index < chunks.length; index += 1) {
+            const chunk = chunks[index] ?? "";
+            if (chunk.length === 0) {
+              continue;
+            }
+            await this.interactionSend(chromeId, "Input.insertText", { text: chunk });
+            if (index + 1 < chunks.length) {
+              await humanizeSleep(humanizeChunkDelayMs(effectiveWpm, index, chunk));
+            }
+          }
+        }
+        if (options?.submitKey !== undefined) {
+          await this.dispatchParsedKey(chromeId, projectTabId, options.submitKey);
+        }
+      } catch (error: unknown) {
+        if (error instanceof SnapshotError) {
+          throw error;
+        }
+        throw this.staleFromCommand(chromeId, projectTabId, error);
+      }
+    } catch (error: unknown) {
+      if (error instanceof SnapshotError) {
+        throw error;
+      }
+      throw this.staleFromCommand(chromeId, projectTabId, error);
+    }
+    this.invalidateTabByProject(projectTabId);
+    return { typed: true };
   }
 
   /**
